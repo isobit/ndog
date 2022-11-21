@@ -294,7 +294,9 @@ func proxyTCP(listenAddr string, connectAddr string) error {
 			continue
 		}
 		logf("accepted: %s", srcConn.RemoteAddr())
-		handleConn(srcConn)
-		logf("closed: %s", srcConn.RemoteAddr())
+		go func() {
+			handleConn(srcConn)
+			logf("closed: %s", srcConn.RemoteAddr())
+		}()
 	}
 }
