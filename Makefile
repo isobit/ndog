@@ -3,7 +3,7 @@
 all: build fmt lint test
 
 build:
-	go build ./...
+	go build ./cmd/ndog.go
 
 fmt:
 	go fmt ./...
