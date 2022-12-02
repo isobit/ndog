@@ -7,6 +7,7 @@ import (
 	"github.com/isobit/ndog/schemes/http"
 	"github.com/isobit/ndog/schemes/tcp"
 	"github.com/isobit/ndog/schemes/udp"
+	"github.com/isobit/ndog/schemes/websocket"
 )
 
 var Registry = map[string]*ndog.Scheme{}
@@ -24,4 +25,5 @@ func init() {
 	registerScheme(tcp.Scheme)
 	registerScheme(udp.Scheme)
 	registerScheme(http.Scheme)
+	registerScheme(websocket.Scheme)
 }
