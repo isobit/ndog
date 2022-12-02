@@ -2,6 +2,9 @@
 
 Ndog is like [Ncat](https://nmap.org/ncat/), but friendlier!
 
+:warning: This project is under active development and is subject to major
+breaking changes prior to the 1.0 release.
+
 ## Examples
 
 | Description                                       | Incantation                    |
