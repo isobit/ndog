@@ -5,6 +5,9 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"sort"
+	"strings"
+	"text/tabwriter"
 
 	"github.com/isobit/cli"
 
@@ -42,13 +45,16 @@ func main() {
 }
 
 type Ndog struct {
-	Verbose    bool     `cli:"short=v"`
-	ListenURL  *url.URL `cli:"name=listen,short=l,placeholder=URL"`
-	ConnectURL *url.URL `cli:"name=connect,short=c,placeholder=URL"`
+	Verbose     bool     `cli:"short=v"`
+	ListenURL   *url.URL `cli:"name=listen,short=l,placeholder=URL"`
+	ConnectURL  *url.URL `cli:"name=connect,short=c,placeholder=URL"`
+	ListSchemes bool
 }
 
 func (cmd Ndog) Run() error {
 	switch {
+	case cmd.ListSchemes:
+		return listSchemes()
 	case cmd.ListenURL != nil && cmd.ConnectURL != nil:
 		return fmt.Errorf("proxy is not supported yet")
 
@@ -82,4 +88,33 @@ func (cmd Ndog) Run() error {
 	default:
 		return cli.UsageErrorf("at least one of --listen or --connect must be specified")
 	}
+}
+
+func listSchemes() error {
+	list := make([]string, len(schemes.Registry))
+	i := 0
+	for name := range schemes.Registry {
+		list[i] = name
+		i++
+	}
+	sort.Strings(list)
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	for _, name := range list {
+		scheme := schemes.Registry[name]
+		supports := []string{}
+		if scheme.Listen != nil {
+			supports = append(supports, "listen")
+		}
+		if scheme.Connect != nil {
+			supports = append(supports, "connect")
+		}
+
+		fmt.Fprintf(w, name)
+		if len(supports) > 0 {
+			fmt.Fprintf(w, "\t (%s)", strings.Join(supports, ", "))
+		}
+		fmt.Fprintln(w)
+	}
+	return w.Flush()
 }
