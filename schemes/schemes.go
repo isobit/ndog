@@ -24,6 +24,7 @@ func registerScheme(scheme *ndog.Scheme) {
 func init() {
 	registerScheme(tcp.Scheme)
 	registerScheme(udp.Scheme)
-	registerScheme(http.Scheme)
+	registerScheme(http.HTTPScheme)
+	registerScheme(http.HTTPSScheme)
 	registerScheme(websocket.Scheme)
 }

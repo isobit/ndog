@@ -13,10 +13,15 @@ import (
 	"github.com/isobit/ndog"
 )
 
-var Scheme = &ndog.Scheme{
+var HTTPScheme = &ndog.Scheme{
 	Names:   []string{"http"},
 	Connect: Connect,
 	Listen:  Listen,
+}
+
+var HTTPSScheme = &ndog.Scheme{
+	Names:   []string{"https"},
+	Connect: Connect,
 }
 
 func Listen(cfg ndog.Config) error {
