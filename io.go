@@ -3,8 +3,84 @@ package ndog
 import (
 	"bufio"
 	"io"
+	"os"
 	"sync"
 )
+
+type Stream interface {
+	io.ReadWriteCloser
+	CloseWriter() error
+}
+
+type StreamFactory interface {
+	NewStream(name string) Stream
+}
+
+type LogStreamFactory struct {
+	StreamFactory
+	Receive io.Writer
+	Send    io.Writer
+}
+
+func (f *LogStreamFactory) NewStream(name string) Stream {
+	stream := f.StreamFactory.NewStream(name)
+	return genericStream{
+		Reader:    io.TeeReader(stream, f.Send),
+		Writer:    io.MultiWriter(stream, f.Receive),
+		CloseFunc: stream.Close,
+	}
+}
+
+type StdIOStreamFactory struct {
+	flr *FanoutLineReader
+}
+
+func NewStdIOStreamFactory() *StdIOStreamFactory {
+	flr := NewFanoutLineReader(os.Stdin)
+	go flr.ScanLoop()
+	return &StdIOStreamFactory{
+		flr: flr,
+	}
+}
+
+func (f *StdIOStreamFactory) NewStream(name string) Stream {
+	r, closeTee := f.flr.Tee()
+	return genericStream{
+		Reader: r,
+		Writer: os.Stdout,
+		CloseWriterFunc: func() error {
+			closeTee()
+			return nil
+		},
+		CloseFunc: func() error {
+			closeTee()
+			return nil
+		},
+	}
+}
+
+type genericStream struct {
+	io.Reader
+	io.Writer
+	CloseWriterFunc func() error
+	CloseFunc       func() error
+}
+
+var _ Stream = genericStream{}
+
+func (rwc genericStream) CloseWriter() error {
+	if rwc.CloseWriterFunc == nil {
+		return nil
+	}
+	return rwc.CloseWriterFunc()
+}
+
+func (rwc genericStream) Close() error {
+	if rwc.CloseFunc == nil {
+		return nil
+	}
+	return rwc.CloseFunc()
+}
 
 type FanoutLineReader struct {
 	r       io.Reader
@@ -25,27 +101,18 @@ func (flr *FanoutLineReader) ScanLoop() {
 	for scanner.Scan() {
 		p := scanner.Bytes()
 		flr.Lock()
-		toRemove := []int{}
+		newWriters := []io.Writer{}
 		for i, w := range flr.writers {
-			// if verbose {
-			// 	logf("writing %d bytes to writer %d", len(p), i)
-			// }
-			_, err := w.Write(p)
-			// if err != nil {
-			// 	logf("writer %d error (n=%d): %s", i, n, err)
-			// }
-			if err == io.ErrClosedPipe {
-				toRemove = append(toRemove, i)
-			} else {
+			Logf(10, "writing %d bytes to writer %d", len(p), i)
+			n, err := w.Write(p)
+			if err == nil {
+				newWriters = append(newWriters, w)
 				w.Write([]byte{'\n'})
+			} else {
+				Logf(10, "writer %d error (n=%d), removing: %s", i, n, err)
 			}
 		}
-		for _, i := range toRemove {
-			// if verbose {
-			// 	logf("removing writer %d", i)
-			// }
-			flr.writers = append(flr.writers[:i], flr.writers[i+1:]...)
-		}
+		flr.writers = newWriters
 		flr.Unlock()
 	}
 }

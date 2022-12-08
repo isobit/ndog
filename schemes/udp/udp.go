@@ -25,10 +25,9 @@ func Listen(cfg ndog.Config) error {
 		return err
 	}
 	defer conn.Close()
-	cfg.Logf("listening: %s", conn.LocalAddr())
+	ndog.Logf(0, "listening: %s", conn.LocalAddr())
 
-	// _, err = io.Copy(cfg.Out, conn)
-	// return err
+	streams := map[string]ndog.Stream{}
 
 	buf := make([]byte, 1024)
 	for {
@@ -39,15 +38,42 @@ func Listen(cfg ndog.Config) error {
 			}
 			return err
 		}
-		if cfg.Verbose {
-			cfg.Logf("read: %d bytes from %s", nr, remoteAddr)
+		remoteAddrStr := remoteAddr.String()
+		ndog.Logf(2, "read: %d bytes from %s", nr, remoteAddrStr)
+
+		var stream ndog.Stream
+		if existingStream, ok := streams[remoteAddrStr]; ok {
+			ndog.Logf(10, "using existing stream: %s", remoteAddrStr)
+			stream = existingStream
+		} else {
+			ndog.Logf(10, "creating new stream: %s", remoteAddrStr)
+			stream = cfg.NewStream(remoteAddrStr)
+			// TODO close stream
+			streams[remoteAddrStr] = stream
+			go io.Copy(newUDPWriter(conn, remoteAddr), stream)
 		}
 
-		_, err = cfg.Out.Write(buf[:nr])
+		_, err = stream.Write(buf[:nr])
 		if err != nil {
 			return err
 		}
 	}
+}
+
+type udpWriter struct {
+	conn *net.UDPConn
+	addr *net.UDPAddr
+}
+
+func newUDPWriter(conn *net.UDPConn, addr *net.UDPAddr) *udpWriter {
+	return &udpWriter{
+		conn: conn,
+		addr: addr,
+	}
+}
+
+func (uw *udpWriter) Write(p []byte) (int, error) {
+	return uw.conn.WriteToUDP(p, uw.addr)
 }
 
 func Connect(cfg ndog.Config) error {
@@ -61,12 +87,16 @@ func Connect(cfg ndog.Config) error {
 		return err
 	}
 	defer conn.Close()
-	cfg.Logf("connected: %s", conn.RemoteAddr())
 
-	go func() {
-		io.Copy(conn, cfg.In)
-	}()
+	remoteAddr := conn.RemoteAddr()
+	ndog.Logf(0, "connected: %s", remoteAddr)
 
-	_, err = io.Copy(cfg.Out, conn)
+	stream := cfg.NewStream(remoteAddr.String())
+	defer stream.Close()
+
+	go io.Copy(conn, stream)
+	_, err = io.Copy(stream, conn)
+
+	ndog.Logf(0, "closed: %s", remoteAddr)
 	return err
 }

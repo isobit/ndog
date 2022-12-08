@@ -25,30 +25,25 @@ func Listen(cfg ndog.Config) error {
 		return err
 	}
 	defer listener.Close()
-	cfg.Logf("listening: %s", listener.Addr())
-
-	in := ndog.NewFanoutLineReader(cfg.In)
-	go in.ScanLoop()
+	ndog.Logf(0, "listening: %s", listener.Addr())
 
 	handleConn := func(conn *net.TCPConn) {
 		defer conn.Close()
 
-		in, cancel := in.Tee()
-		defer cancel()
-		go io.Copy(conn, in)
-
-		// io.Copy(out, conn)
 		remoteAddr := conn.RemoteAddr()
+
+		stream := cfg.NewStream(remoteAddr.String())
+		defer stream.Close()
+		go io.Copy(conn, stream)
+
 		buf := make([]byte, 1024)
 		for {
 			nr, err := conn.Read(buf)
 			if err != nil {
 				return
 			}
-			if cfg.Verbose {
-				cfg.Logf("read: %d bytes from %s", nr, remoteAddr)
-			}
-			_, err = cfg.Out.Write(buf[:nr])
+			ndog.Logf(2, "read: %d bytes from %s", nr, remoteAddr)
+			_, err = stream.Write(buf[:nr])
 			if err != nil {
 				return
 			}
@@ -59,16 +54,16 @@ func Listen(cfg ndog.Config) error {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
 			if conn != nil {
-				cfg.Logf("accept error: %s: %s", conn.RemoteAddr(), err)
+				ndog.Logf(-1, "accept error: %s: %s", conn.RemoteAddr(), err)
 			} else {
-				cfg.Logf("accept error: %s", err)
+				ndog.Logf(-1, "accept error: %s", err)
 			}
 			continue
 		}
-		cfg.Logf("accepted: %s", conn.RemoteAddr())
+		ndog.Logf(1, "accepted: %s", conn.RemoteAddr())
 		go func() {
 			handleConn(conn)
-			cfg.Logf("closed: %s", conn.RemoteAddr())
+			ndog.Logf(1, "closed: %s", conn.RemoteAddr())
 		}()
 	}
 }
@@ -84,13 +79,16 @@ func Connect(cfg ndog.Config) error {
 		return err
 	}
 	defer conn.Close()
-	cfg.Logf("connected: %s", conn.RemoteAddr())
 
-	go func() {
-		io.Copy(conn, cfg.In)
-	}()
+	remoteAddr := conn.RemoteAddr()
+	ndog.Logf(0, "connected: %s", remoteAddr)
 
-	_, err = io.Copy(cfg.Out, conn)
-	cfg.Logf("closed: %s", conn.RemoteAddr())
+	stream := cfg.NewStream(remoteAddr.String())
+	defer stream.Close()
+
+	go io.Copy(conn, stream)
+	_, err = io.Copy(stream, conn)
+
+	ndog.Logf(0, "closed: %s", remoteAddr)
 	return err
 }

@@ -20,34 +20,35 @@ func Listen(cfg ndog.Config) error {
 	s := &http.Server{
 		Addr: cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cfg.Logf("request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
-			if cfg.Verbose {
-				for key, values := range r.Header {
-					cfg.Logf("request header: %s: %s", key, strings.Join(values, ", "))
-				}
+			ndog.Logf(1, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
+			for key, values := range r.Header {
+				ndog.Logf(2, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
 			wsHandler := websocket.Handler(func(conn *websocket.Conn) {
+				stream := cfg.NewStream(r.RemoteAddr)
+				defer stream.Close()
+
+				go io.Copy(conn, stream)
+
 				buf := make([]byte, 1024)
 				for {
 					nr, err := conn.Read(buf)
 					if err != nil {
 						return
 					}
-					if cfg.Verbose {
-						cfg.Logf("read: %d bytes from %s", nr, r.RemoteAddr)
-					}
+					ndog.Logf(2, "read: %d bytes from %s", nr, r.RemoteAddr)
 
-					_, err = cfg.Out.Write(buf[:nr])
+					_, err = stream.Write(buf[:nr])
 					if err != nil {
 						return
 					}
 				}
 			})
 			wsHandler.ServeHTTP(w, r)
-			cfg.Logf("closed: %s", r.RemoteAddr)
+			ndog.Logf(1, "closed: %s", r.RemoteAddr)
 		}),
 	}
-	cfg.Logf("listening: %s", s.Addr)
+	ndog.Logf(0, "listening: %s", s.Addr)
 	return s.ListenAndServe()
 }
 
@@ -57,13 +58,16 @@ func Connect(cfg ndog.Config) error {
 		return err
 	}
 	defer conn.Close()
-	cfg.Logf("connected: %s", conn.RemoteAddr())
 
-	go func() {
-		io.Copy(conn, cfg.In)
-	}()
+	remoteAddr := conn.RemoteAddr()
+	ndog.Logf(0, "connected: %s", remoteAddr)
 
-	_, err = io.Copy(cfg.Out, conn)
-	cfg.Logf("closed: %s", conn.RemoteAddr())
+	stream := cfg.NewStream(remoteAddr.String())
+	defer stream.Close()
+
+	go io.Copy(conn, stream)
+	_, err = io.Copy(stream, conn)
+
+	ndog.Logf(0, "closed: %s", remoteAddr)
 	return err
 }
