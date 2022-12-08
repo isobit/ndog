@@ -15,7 +15,7 @@ import (
 
 var Scheme = &ndog.Scheme{
 	Names:   []string{"http"},
-	Connect: nil,
+	Connect: Connect,
 	Listen:  Listen,
 }
 
@@ -102,4 +102,21 @@ func Listen(cfg ndog.Config) error {
 	}
 	ndog.Logf(0, "listening: %s", s.Addr)
 	return s.ListenAndServe()
+}
+
+func Connect(cfg ndog.Config) error {
+	ndog.Logf(0, "request: GET %s", cfg.URL.RequestURI())
+	stream := cfg.NewStream("")
+	defer stream.Close()
+	resp, err := http.Get(cfg.URL.String())
+	if err != nil {
+		return err
+	}
+	ndog.Logf(0, "response: %s", resp.Status)
+	io.Copy(stream, resp.Body)
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("got error response: %s", resp.Status)
+	}
+	return nil
 }
