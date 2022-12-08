@@ -15,7 +15,11 @@ func Logf(level int, format string, v ...interface{}) (int, error) {
 		return 0, nil
 	}
 	if LogColor {
-		format = "\u001b[30;1m" + format + "\u001b[0m"
+		if level >= 0 {
+			format = "\u001b[30;1m" + format + "\u001b[0m"
+		} else {
+			format = "\u001b[31;1m" + format + "\u001b[0m"
+		}
 	}
 	if len(format) > 0 && format[len(format)-1] != '\n' {
 		format = format + "\n"
