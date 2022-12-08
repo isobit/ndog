@@ -22,10 +22,14 @@ func main() {
 		}
 	}
 
-	cli.New("ndog", &Ndog{}).
+	err := cli.New("ndog", &Ndog{}).
 		SetDescription(description).
 		Parse().
-		RunFatal()
+		Run()
+
+	if err != nil && err != cli.ErrHelp {
+		ndog.Logf(-1, "error: %s", err)
+	}
 }
 
 type Ndog struct {
