@@ -30,6 +30,7 @@ func main() {
 
 type Ndog struct {
 	Verbose  bool `cli:"short=v"`
+	Quiet    bool `cli:"short=q"`
 	LogLevel int  `cli:"hidden"`
 
 	ListenURL  *url.URL `cli:"name=listen,short=l,placeholder=URL"`
@@ -68,10 +69,14 @@ func (cmd Ndog) Run() error {
 		return listSchemes()
 	}
 
-	if cmd.Verbose {
-		ndog.LogLevel = 1 // TODO
-	}
-	if cmd.LogLevel != 0 {
+	switch {
+	case cmd.Verbose && cmd.Quiet:
+		return cli.UsageErrorf("--verbose and --quiet are mutually exclusive")
+	case cmd.Verbose:
+		ndog.LogLevel = 1
+	case cmd.Quiet:
+		ndog.LogLevel = -10
+	case cmd.LogLevel != 0:
 		ndog.LogLevel = cmd.LogLevel
 	}
 
