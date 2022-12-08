@@ -118,6 +118,9 @@ func Connect(cfg ndog.Config) error {
 		return err
 	}
 	ndog.Logf(0, "response: %s", resp.Status)
+	for key, values := range resp.Header {
+		ndog.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
+	}
 	io.Copy(stream, resp.Body)
 
 	if resp.StatusCode >= 400 {
