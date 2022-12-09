@@ -42,6 +42,7 @@ type Ndog struct {
 
 	Exec    string   `cli:"short=x,help=execute a command to handle streams"`
 	Options []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
+	Log     bool
 
 	ListSchemes bool `cli:"help=list available schemes"`
 }
@@ -76,12 +77,12 @@ func (cmd Ndog) Run() error {
 	switch {
 	case cmd.Verbose && cmd.Quiet:
 		return cli.UsageErrorf("--verbose and --quiet are mutually exclusive")
+	case cmd.LogLevel != 0:
+		ndog.LogLevel = cmd.LogLevel
 	case cmd.Verbose:
 		ndog.LogLevel = 1
 	case cmd.Quiet:
 		ndog.LogLevel = -10
-	case cmd.LogLevel != 0:
-		ndog.LogLevel = cmd.LogLevel
 	}
 
 	var streamFactory ndog.StreamFactory
@@ -93,6 +94,9 @@ func (cmd Ndog) Run() error {
 		streamFactory = ndog.NewExecStreamFactory(args[0], args[1:]...)
 	} else {
 		streamFactory = ndog.NewStdIOStreamFactory()
+	}
+	if cmd.Log {
+		streamFactory = ndog.NewLogStreamFactory(streamFactory)
 	}
 
 	// Parse options.

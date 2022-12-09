@@ -42,7 +42,6 @@ func Listen(cfg ndog.Config) error {
 			if err != nil {
 				return
 			}
-			ndog.Logf(2, "read: %d bytes from %s", nr, remoteAddr)
 			_, err = stream.Write(buf[:nr])
 			if err != nil {
 				return

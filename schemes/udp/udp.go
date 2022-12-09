@@ -39,7 +39,6 @@ func Listen(cfg ndog.Config) error {
 			return err
 		}
 		remoteAddrStr := remoteAddr.String()
-		ndog.Logf(2, "read: %d bytes from %s", nr, remoteAddrStr)
 
 		var stream ndog.Stream
 		if existingStream, ok := streams[remoteAddrStr]; ok {

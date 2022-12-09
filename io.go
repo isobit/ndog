@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 )
 
@@ -18,16 +19,59 @@ type StreamFactory interface {
 
 type LogStreamFactory struct {
 	StreamFactory
-	Receive io.Writer
-	Send    io.Writer
+	recvWriter io.Writer
+	recvReader io.Reader
+	sendWriter io.Writer
+	sendReader io.Reader
+}
+
+func NewLogStreamFactory(delegate StreamFactory) *LogStreamFactory {
+	recvReader, recvWriter := io.Pipe()
+	sendReader, sendWriter := io.Pipe()
+	return &LogStreamFactory{
+		StreamFactory: delegate,
+		recvWriter:    recvWriter,
+		recvReader:    recvReader,
+		sendWriter:    sendWriter,
+		sendReader:    sendReader,
+	}
 }
 
 func (f *LogStreamFactory) NewStream(name string) Stream {
 	stream := f.StreamFactory.NewStream(name)
+	recvReader, recvWriter := io.Pipe()
+	sendReader, sendWriter := io.Pipe()
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := recvReader.Read(buf)
+			if err != nil {
+				break
+			}
+			Logf(0, "<-%s %s", name, strconv.Quote(string(buf[:n])))
+		}
+		Logf(10, "log done scanning recvs %s", name)
+	}()
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			n, err := sendReader.Read(buf)
+			if err != nil {
+				break
+			}
+			Logf(0, "->%s %s", name, strconv.Quote(string(buf[:n])))
+		}
+		Logf(10, "log done scanning sends %s", name)
+	}()
 	return genericStream{
-		Reader:    io.TeeReader(stream, f.Send),
-		Writer:    io.MultiWriter(stream, f.Receive),
-		CloseFunc: stream.Close,
+		Reader:          io.TeeReader(stream, sendWriter),
+		Writer:          io.MultiWriter(stream, recvWriter),
+		CloseWriterFunc: stream.CloseWriter,
+		CloseFunc: func() error {
+			recvWriter.Close()
+			sendWriter.Close()
+			return stream.Close()
+		},
 	}
 }
 
