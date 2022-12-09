@@ -128,14 +128,16 @@ func (rwc genericStream) Close() error {
 
 type FanoutLineReader struct {
 	r       io.Reader
-	writers []io.Writer
+	writers []io.WriteCloser
 	sync.Mutex
+	wakeScanCh chan bool
 }
 
 func NewFanoutLineReader(r io.Reader) *FanoutLineReader {
 	flr := &FanoutLineReader{
-		r:       r,
-		writers: []io.Writer{},
+		r:          r,
+		writers:    []io.WriteCloser{},
+		wakeScanCh: make(chan bool),
 	}
 	return flr
 }
@@ -144,21 +146,35 @@ func (flr *FanoutLineReader) ScanLoop() {
 	scanner := bufio.NewScanner(flr.r)
 	for scanner.Scan() {
 		p := scanner.Bytes()
+		Logf(10, "FanoutLineReader: scan %d bytes", len(p))
 		flr.Lock()
-		newWriters := []io.Writer{}
-		for i, w := range flr.writers {
-			Logf(10, "writing %d bytes to writer %d", len(p), i)
-			n, err := w.Write(p)
-			if err == nil {
-				newWriters = append(newWriters, w)
-				w.Write([]byte{'\n'})
-			} else {
-				Logf(10, "writer %d error (n=%d), removing: %s", i, n, err)
-			}
+		if len(flr.writers) == 0 {
+			Logf(10, "FanoutLineReader: no writers, blocking until wake")
+			flr.Unlock()
+			<-flr.wakeScanCh
+			Logf(10, "FanoutLineReader: wake scanner")
+			flr.Lock()
 		}
-		flr.writers = newWriters
+		openWriters := []io.WriteCloser{}
+		for i, w := range flr.writers {
+			Logf(10, "FanoutLineReader: writing %d bytes to writer %d", len(p), i)
+			n, err := w.Write(p)
+			if err != nil {
+				Logf(10, "FanoutLineReader: writer %d error (n=%d), removing: %s", i, n, err)
+				continue
+			}
+			w.Write([]byte{'\n'})
+			openWriters = append(openWriters, w)
+		}
+		flr.writers = openWriters
 		flr.Unlock()
 	}
+	flr.Lock()
+	for i, w := range flr.writers {
+		Logf(10, "FanoutLineReader: closing writer %d", i)
+		w.Close()
+	}
+	flr.Unlock()
 }
 
 func (flr *FanoutLineReader) Tee() (io.Reader, func()) {
@@ -166,9 +182,12 @@ func (flr *FanoutLineReader) Tee() (io.Reader, func()) {
 	flr.Lock()
 	flr.writers = append(flr.writers, pw)
 	flr.Unlock()
+	select {
+	case flr.wakeScanCh <- true:
+	default:
+	}
 	closeFunc := func() {
 		pr.Close()
-		pw.Close()
 	}
 	return pr, closeFunc
 }
