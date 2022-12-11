@@ -2,6 +2,7 @@ package ndog
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -75,34 +76,6 @@ func (f *LogStreamFactory) NewStream(name string) Stream {
 	}
 }
 
-type StdIOStreamFactory struct {
-	flr *FanoutLineReader
-}
-
-func NewStdIOStreamFactory() *StdIOStreamFactory {
-	flr := NewFanoutLineReader(os.Stdin)
-	go flr.ScanLoop()
-	return &StdIOStreamFactory{
-		flr: flr,
-	}
-}
-
-func (f *StdIOStreamFactory) NewStream(name string) Stream {
-	r, closeTee := f.flr.Tee()
-	return genericStream{
-		Reader: r,
-		Writer: os.Stdout,
-		CloseWriterFunc: func() error {
-			closeTee()
-			return nil
-		},
-		CloseFunc: func() error {
-			closeTee()
-			return nil
-		},
-	}
-}
-
 type genericStream struct {
 	io.Reader
 	io.Writer
@@ -126,124 +99,100 @@ func (rwc genericStream) Close() error {
 	return rwc.CloseFunc()
 }
 
-type FanoutLineReader struct {
-	r       io.Reader
-	writers []io.WriteCloser
-	sync.Mutex
-	wakeScanCh chan bool
+type StdIOStreamFactory struct {
+	fanout *Fanout
 }
 
-func NewFanoutLineReader(r io.Reader) *FanoutLineReader {
-	flr := &FanoutLineReader{
-		r:          r,
-		writers:    []io.WriteCloser{},
-		wakeScanCh: make(chan bool),
+func NewStdIOStreamFactory() *StdIOStreamFactory {
+	fanout := NewFanout()
+	go scanLines(os.Stdin, fanout)
+	return &StdIOStreamFactory{
+		fanout: fanout,
 	}
-	return flr
 }
 
-func (flr *FanoutLineReader) ScanLoop() {
-	scanner := bufio.NewScanner(flr.r)
+func (f *StdIOStreamFactory) NewStream(name string) Stream {
+	rc := f.fanout.Tee()
+	return genericStream{
+		Reader:    rc,
+		Writer:    os.Stdout,
+		CloseFunc: rc.Close,
+	}
+}
+
+func scanLines(r io.Reader, w io.Writer) error {
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		p := scanner.Bytes()
-		Logf(10, "FanoutLineReader: scan %d bytes", len(p))
-		flr.Lock()
-		if len(flr.writers) == 0 {
-			Logf(10, "FanoutLineReader: no writers, blocking until wake")
-			flr.Unlock()
-			<-flr.wakeScanCh
-			Logf(10, "FanoutLineReader: wake scanner")
-			flr.Lock()
+		_, err := w.Write(scanner.Bytes())
+		if err != nil {
+			return err
 		}
-		openWriters := []io.WriteCloser{}
-		for i, w := range flr.writers {
-			Logf(10, "FanoutLineReader: writing %d bytes to writer %d", len(p), i)
-			n, err := w.Write(p)
-			if err != nil {
-				Logf(10, "FanoutLineReader: writer %d error (n=%d), removing: %s", i, n, err)
-				continue
-			}
-			w.Write([]byte{'\n'})
-			openWriters = append(openWriters, w)
-		}
-		flr.writers = openWriters
-		flr.Unlock()
 	}
-	flr.Lock()
-	for i, w := range flr.writers {
-		Logf(10, "FanoutLineReader: closing writer %d", i)
+	return scanner.Err()
+}
+
+type Fanout struct {
+	sync.Mutex
+	writers []io.WriteCloser
+	wakeCh  chan bool
+	closed  bool
+}
+
+func NewFanout() *Fanout {
+	return &Fanout{
+		writers: []io.WriteCloser{},
+		wakeCh:  make(chan bool),
+	}
+}
+
+func (f *Fanout) Close() error {
+	f.Lock()
+	defer f.Unlock()
+	for _, w := range f.writers {
 		w.Close()
 	}
-	flr.Unlock()
+	f.closed = true
+	return nil
 }
 
-func (flr *FanoutLineReader) Tee() (io.Reader, func()) {
+func (f *Fanout) Write(p []byte) (int, error) {
+	f.Lock()
+	defer f.Unlock()
+	if f.closed {
+		return 0, fmt.Errorf("fanout is closed")
+	}
+	if len(f.writers) == 0 {
+		f.Unlock()
+		<-f.wakeCh
+		f.Lock()
+	}
+	openWriters := []io.WriteCloser{}
+	for _, w := range f.writers {
+		_, err := w.Write(p)
+		if err != nil {
+			continue
+		}
+		w.Write([]byte{'\n'})
+		openWriters = append(openWriters, w)
+	}
+	f.writers = openWriters
+	return len(p), nil
+}
+
+func (f *Fanout) Tee() io.ReadCloser {
 	pr, pw := io.Pipe()
-	flr.Lock()
-	flr.writers = append(flr.writers, pw)
-	flr.Unlock()
+
+	f.Lock()
+	f.writers = append(f.writers, pw)
+	f.Unlock()
+
+	// Wake any outstanding write now that there is a writer to handle it.
+	// Select with a no-op default to make this non-blocking if there's no
+	// write call waiting to receive from the channel.
 	select {
-	case flr.wakeScanCh <- true:
+	case f.wakeCh <- true:
 	default:
 	}
-	closeFunc := func() {
-		pr.Close()
-	}
-	return pr, closeFunc
-}
 
-func TeeLinesReader(r io.Reader, lineHandler func([]byte)) (io.Reader, func()) {
-	pr, pw := io.Pipe()
-	go func() {
-		defer pr.Close()
-		defer pw.Close()
-		scanner := bufio.NewScanner(pr)
-		for scanner.Scan() {
-			lineHandler(scanner.Bytes())
-		}
-	}()
-	return io.TeeReader(r, pw), func() { pr.Close() }
-}
-
-func BidirectionalCopyWithTee(rw1 io.ReadWriter, rw2 io.ReadWriter, log io.Writer) error {
-	doneCh := make(chan struct{})
-	errCh := make(chan error)
-
-	go func() {
-		tr1, tr1Close := TeeLinesReader(rw1, func(p []byte) {
-			io.WriteString(log, "-> ")
-			log.Write(p)
-			io.WriteString(log, "\n")
-		})
-		defer tr1Close()
-
-		_, err := io.Copy(rw2, tr1)
-		// logf("-> DONE; err=%v", err)
-		select {
-		case <-doneCh:
-			return
-		case errCh <- err:
-		}
-	}()
-
-	go func() {
-		tr2, tr2Close := TeeLinesReader(rw2, func(p []byte) {
-			io.WriteString(log, "<- ")
-			log.Write(p)
-			io.WriteString(log, "\n")
-		})
-		defer tr2Close()
-
-		_, err := io.Copy(rw1, tr2)
-		// logf("<- DONE; err=%v", err)
-		select {
-		case <-doneCh:
-			return
-		case errCh <- err:
-		}
-	}()
-	err := <-errCh
-	// logf("<-> got err; err=%v", err)
-	close(doneCh)
-	return err
+	return pr
 }
