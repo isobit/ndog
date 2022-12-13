@@ -43,6 +43,7 @@ type Ndog struct {
 	Exec    string   `cli:"short=x,help=execute a command to handle streams"`
 	Options []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
 	Log     bool
+	Interactive bool `cli:"short=i"`
 
 	ListSchemes bool `cli:"help=list available schemes"`
 }
@@ -97,6 +98,20 @@ func (cmd Ndog) Run() error {
 	}
 	if cmd.Log {
 		streamFactory = ndog.NewLogStreamFactory(streamFactory)
+	}
+	if cmd.Interactive {
+		ndog.LogLevel = -10
+		tui, err := ndog.NewTUI()
+		if err != nil {
+			return err
+		}
+		return tui.Run()
+		go func() {
+			err := tui.Run()
+			fmt.Println(err)
+			os.Exit(0)
+		}()
+		streamFactory = tui
 	}
 
 	// Parse options.
