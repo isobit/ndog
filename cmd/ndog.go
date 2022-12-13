@@ -40,9 +40,10 @@ type Ndog struct {
 	ListenURL  *url.URL `cli:"name=listen,short=l,placeholder=URL"`
 	ConnectURL *url.URL `cli:"name=connect,short=c,placeholder=URL"`
 
-	Exec    string   `cli:"short=x,help=execute a command to handle streams"`
-	Options []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
-	Log     bool
+	Exec        string   `cli:"short=x,help=execute a command to handle streams"`
+	Options     []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
+	Log         bool
+	Interactive bool `cli:"short=i"`
 
 	ListSchemes bool `cli:"help=list available schemes"`
 }
@@ -72,10 +73,27 @@ func (cmd Ndog) Run() error {
 			return cli.UsageErrorf("failed to split exec args: %s", err)
 		}
 		streamFactory = ndog.NewExecStreamFactory(args[0], args[1:]...)
-	} else {
+	}
+	if cmd.Interactive {
+		// ndog.LogLevel = -10
+		tui := ndog.NewTUI(streamFactory)
+		streamFactory = tui
+		originalLogf := ndog.Logf
+		ndog.Logf = tui.Logf
+		go func() {
+			err := tui.Run()
+			ndog.Logf = originalLogf
+			if err != nil {
+				ndog.Logf(-1, "error: %s", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		}()
+	}
+	if streamFactory == nil {
 		streamFactory = ndog.NewStdIOStreamFactory()
 	}
-	if cmd.Log {
+	if cmd.Log || cmd.Interactive {
 		streamFactory = ndog.NewLogStreamFactory(streamFactory)
 	}
 
