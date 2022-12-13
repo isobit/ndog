@@ -10,7 +10,9 @@ var Log io.Writer = os.Stderr
 var LogLevel int = 0
 var LogColor bool = false
 
-func Logf(level int, format string, v ...interface{}) (int, error) {
+var Logf func(int, string, ...interface{}) (int, error) = defaultLogf
+
+func defaultLogf(level int, format string, v ...interface{}) (int, error) {
 	if level > LogLevel {
 		return 0, nil
 	}

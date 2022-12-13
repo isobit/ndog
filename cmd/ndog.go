@@ -93,25 +93,28 @@ func (cmd Ndog) Run() error {
 			return cli.UsageErrorf("failed to split exec args: %s", err)
 		}
 		streamFactory = ndog.NewExecStreamFactory(args[0], args[1:]...)
-	} else {
-		streamFactory = ndog.NewStdIOStreamFactory()
-	}
-	if cmd.Log {
-		streamFactory = ndog.NewLogStreamFactory(streamFactory)
 	}
 	if cmd.Interactive {
-		ndog.LogLevel = -10
-		tui, err := ndog.NewTUI()
-		if err != nil {
-			return err
-		}
-		return tui.Run()
+		// ndog.LogLevel = -10
+		tui := ndog.NewTUI(streamFactory)
+		streamFactory = tui
+		originalLogf := ndog.Logf
+		ndog.Logf = tui.Logf
 		go func() {
 			err := tui.Run()
-			fmt.Println(err)
+			ndog.Logf = originalLogf
+			if err != nil {
+				ndog.Logf(-1, "error: %s", err)
+				os.Exit(1)
+			}
 			os.Exit(0)
 		}()
-		streamFactory = tui
+	}
+	if streamFactory == nil {
+		streamFactory = ndog.NewStdIOStreamFactory()
+	}
+	if cmd.Log || cmd.Interactive {
+		streamFactory = ndog.NewLogStreamFactory(streamFactory)
 	}
 
 	// Parse options.
