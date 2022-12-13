@@ -40,9 +40,9 @@ type Ndog struct {
 	ListenURL  *url.URL `cli:"name=listen,short=l,placeholder=URL"`
 	ConnectURL *url.URL `cli:"name=connect,short=c,placeholder=URL"`
 
-	Exec    string   `cli:"short=x,help=execute a command to handle streams"`
-	Options []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
-	Log     bool
+	Exec        string   `cli:"short=x,help=execute a command to handle streams"`
+	Options     []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
+	Log         bool
 	Interactive bool `cli:"short=i"`
 
 	ListSchemes bool `cli:"help=list available schemes"`

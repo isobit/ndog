@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rivo/tview"
 	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
 )
 
 type TUI struct {
 	delegate StreamFactory
-	app *tview.Application
+	app      *tview.Application
 	treeRoot *tview.TreeNode
-	logView *tview.TextView
-	input *tview.InputField
+	logView  *tview.TextView
+	input    *tview.InputField
 }
 
 func NewTUI(delegate StreamFactory) *TUI {
@@ -81,21 +81,41 @@ func NewTUI(delegate StreamFactory) *TUI {
 		app.SetFocus(input)
 	})
 
+	getCurrentWriterCloser := func() (io.WriteCloser, bool) {
+		node := tree.GetCurrentNode()
+		if node == nil {
+			return nil, false
+		}
+		rc, ok := node.GetReference().(io.WriteCloser)
+		return rc, ok
+	}
+
 	input.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
-			node := tree.GetCurrentNode()
-			ref := node.GetReference()
-			w, ok := ref.(io.Writer)
-			text := input.GetText()
-			Logf(10, "input done; text=%s, ok=%v", text, ok)
-			if ok {
-				io.WriteString(w, text + "\n")
+			if writer, writerOk := getCurrentWriterCloser(); writerOk {
+				text := input.GetText()
+				// Logf(10, "input done; text=%s, ok=%v", text, writerOk)
+				io.WriteString(writer, text+"\n")
+			} else {
+				Logf(-1, "failed to send input, no writer reference on node item")
 			}
 		}
 		input.SetText("")
 		if key == tcell.KeyEscape {
 			app.SetFocus(tree)
 		}
+	})
+	input.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyCtrlD {
+			if writer, writerOk := getCurrentWriterCloser(); writerOk {
+				writer.Close()
+				input.SetText("")
+				app.SetFocus(tree)
+			} else {
+				Logf(-1, "failed to close writer, no writer reference on node item")
+			}
+		}
+		return event
 	})
 
 	// // If a directory was selected, open it.
@@ -116,10 +136,10 @@ func NewTUI(delegate StreamFactory) *TUI {
 	// })
 	return &TUI{
 		delegate: delegate,
-		app: app,
+		app:      app,
 		treeRoot: treeRoot,
-		logView: logView,
-		input: input,
+		logView:  logView,
+		input:    input,
 	}
 }
 
@@ -131,8 +151,8 @@ func (tui *TUI) NewStream(name string) Stream {
 	if tui.delegate != nil {
 		stream := tui.delegate.NewStream(name)
 		res = genericStream{
-			Reader: stream,
-			Writer: stream,
+			Reader:          stream,
+			Writer:          stream,
 			CloseWriterFunc: stream.CloseWriter,
 			CloseFunc: func() error {
 				tui.app.QueueUpdateDraw(func() {
