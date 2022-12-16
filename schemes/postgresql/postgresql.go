@@ -32,7 +32,24 @@ func splitStatements(data []byte, atEOF bool) (advance int, token []byte, err er
 	return 0, nil, nil
 }
 
+type Options struct {
+	JSON bool
+}
+
+func ExtractOptions(cfg ndog.Config) (Options, error) {
+	opts := Options{}
+	if _, ok := cfg.PopOption("json"); ok {
+		opts.JSON = true
+	}
+	return opts, cfg.CheckRemainingOptions()
+}
+
 func Connect(cfg ndog.Config) error {
+	opts, err := ExtractOptions(cfg)
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, cfg.URL.String())
 	if err != nil {
@@ -56,7 +73,7 @@ func Connect(cfg ndog.Config) error {
 		if err != nil {
 			return err
 		}
-		if cfg.JSON {
+		if opts.JSON {
 			if err := rowsToJSON(stream, rows); err != nil {
 				return err
 			}
