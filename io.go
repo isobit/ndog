@@ -41,26 +41,6 @@ func (rwc genericStream) Close() error {
 	return rwc.CloseFunc()
 }
 
-// type nopStream struct {}
-
-// var _ Stream = nopStream{}
-
-// func (nopStream) Read(p []byte) (int, error) {
-// 	return 0, nil
-// }
-
-// func (nopStream) Write(p []byte) (int, error) {
-// 	return 0, nil
-// }
-
-// func (nopStream) CloseWriter() error {
-// 	return nil
-// }
-
-// func (nopStream) Close() error {
-// 	return nil
-// }
-
 type LogStreamFactory struct {
 	StreamFactory
 }
