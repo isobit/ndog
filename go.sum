@@ -9,6 +9,8 @@ github.com/huandu/xstrings v1.3.2 h1:L18LIDzqlW6xN2rEkpdV8+oL/IXWJ1APd+vsdYy4Wdw
 github.com/huandu/xstrings v1.3.2/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/isobit/cli v0.10.1 h1:qAZQsM+9iHDpf8CFVQa8Sd8erfNnq2A0GVA6imT69nA=
 github.com/isobit/cli v0.10.1/go.mod h1:oYxyNBV/5MOsP2DN/0kuovB2XwAOEmDmHdIUQCGQFD0=
+github.com/isobit/tview v0.0.0-20221215024908-a9f6043b615b h1:r7hg7+leSpfHiEPF8Phy/2cIx/lr9c96gFx62qeRcUg=
+github.com/isobit/tview v0.0.0-20221215024908-a9f6043b615b/go.mod h1:m6iuPP109dOAtOYuaAzoaLuvZwfgWH5DXjsFeLEPFIs=
 github.com/lucasb-eyer/go-colorful v1.2.0 h1:1nnpGOrhyZZuNyfu1QjKiUICQ74+3FNCN69Aj6K7nkY=
 github.com/lucasb-eyer/go-colorful v1.2.0/go.mod h1:R4dSotOR9KMtayYi1e77YzuveK+i7ruzyGqttikkLy0=
 github.com/mattn/go-runewidth v0.0.13 h1:lTGmDsbAYt5DmK6OnoV7EuIF1wEIFAcxld6ypU4OSgU=
@@ -16,8 +18,6 @@ github.com/mattn/go-runewidth v0.0.13/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh
 github.com/philhofer/fwd v1.1.1 h1:GdGcTjf5RNAxwS4QLsiMzJYj5KEvPJD3Abr261yRQXQ=
 github.com/philhofer/fwd v1.1.1/go.mod h1:gk3iGcWd9+svBvR0sR+KPcfE+RNWozjowpeBVG3ZVNU=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
-github.com/rivo/tview v0.0.0-20221212150847-19d943d59543 h1:qu4/1SXI23subKkH50FN7t6r0tPg7i7jI48M5kZ2qEE=
-github.com/rivo/tview v0.0.0-20221212150847-19d943d59543/go.mod h1:YX2wUZOcJGOIycErz2s9KvDaP0jnWwRCirQMPLPpQ+Y=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.2 h1:YwD0ulJSJytLpiaWua0sBDusfsCZohxjxzVTYjwxfV8=
 github.com/rivo/uniseg v0.4.2/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=

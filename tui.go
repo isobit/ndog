@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/rivo/tview"
+	"github.com/isobit/tview"
 )
 
 type TUI struct {
