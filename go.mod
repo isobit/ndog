@@ -6,7 +6,7 @@ require (
 	github.com/gdamore/tcell/v2 v2.4.1-0.20210905002822-f057f0a857a1
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/isobit/cli v0.10.1
-	github.com/isobit/tview v0.0.0-20221215024908-a9f6043b615b
+	github.com/isobit/tview v0.0.0-20221216035341-0f3993097c38
 	github.com/tinylib/msgp v1.1.6
 	golang.org/x/net v0.2.0
 )
