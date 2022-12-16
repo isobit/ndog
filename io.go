@@ -107,7 +107,10 @@ type StdIOStreamFactory struct {
 
 func NewStdIOStreamFactory() *StdIOStreamFactory {
 	fanout := NewFanout()
-	go scanLines(os.Stdin, fanout)
+	go func() {
+		defer fanout.Close()
+		scanLines(os.Stdin, fanout)
+	}()
 	return &StdIOStreamFactory{
 		fanout: fanout,
 	}
