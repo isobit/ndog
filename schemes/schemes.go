@@ -5,6 +5,7 @@ import (
 
 	"github.com/isobit/ndog"
 	"github.com/isobit/ndog/schemes/http"
+	"github.com/isobit/ndog/schemes/postgresql"
 	"github.com/isobit/ndog/schemes/tcp"
 	"github.com/isobit/ndog/schemes/udp"
 	"github.com/isobit/ndog/schemes/websocket"
@@ -22,9 +23,10 @@ func registerScheme(scheme *ndog.Scheme) {
 }
 
 func init() {
+	registerScheme(http.HTTPSScheme)
+	registerScheme(http.HTTPScheme)
+	registerScheme(postgresql.Scheme)
 	registerScheme(tcp.Scheme)
 	registerScheme(udp.Scheme)
-	registerScheme(http.HTTPScheme)
-	registerScheme(http.HTTPSScheme)
 	registerScheme(websocket.Scheme)
 }
