@@ -24,8 +24,18 @@ var HTTPSScheme = &ndog.Scheme{
 	Connect: Connect,
 }
 
-func Listen(cfg ndog.Config) error {
-	writeRequestLine := false
+type Options struct {
+	StatusCode int
+	ServeFile string
+	WriteRequestLine bool
+	MsgpackToJSON bool
+}
+
+func ExtractOptions() (Options, error) {
+	opts := Options{
+		StatusCode: 200,
+	}
+
 	if _, ok := cfg.Options["request_line"]; ok {
 		writeRequestLine = true
 	}
@@ -61,6 +71,9 @@ func Listen(cfg ndog.Config) error {
 		ndog.Logf(1, "http: will serve file(s) from %s", serveFile)
 	}
 
+}
+
+func Listen(cfg ndog.Config) error {
 	s := &http.Server{
 		Addr: cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +103,7 @@ func Listen(cfg ndog.Config) error {
 				}
 			} else {
 				io.Copy(stream, r.Body)
+				fmt.Fprintf(stream, "\n")
 			}
 			stream.CloseWriter()
 
