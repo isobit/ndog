@@ -1,4 +1,4 @@
-.PHONY: all build fmt test lint vet
+.PHONY: all build fmt test lint
 
 all: build fmt lint test
 
@@ -10,11 +10,8 @@ fmt:
 
 lint:
 	@test -z $(shell gofmt -l . | tee /dev/stderr) || { echo "files above are not go fmt"; exit 1; }
-	# golangci-lint run
-
-vet:
-	# This is also run by golangci-lint (make lint)
 	go vet ./...
 
-# test:
-# 	go test ./...
+test:
+	# TODO no tests yet
+	# go test ./...
