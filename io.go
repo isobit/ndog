@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"sync"
 )
 
@@ -39,66 +38,6 @@ func (rwc genericStream) Close() error {
 		return nil
 	}
 	return rwc.CloseFunc()
-}
-
-type LogStreamFactory struct {
-	StreamFactory
-}
-
-func StreamWithLogging(stream Stream, logRecv func([]byte), logSend func([]byte)) Stream {
-	recvReader, recvWriter := io.Pipe()
-	sendReader, sendWriter := io.Pipe()
-	go func() {
-		buf := make([]byte, 1024)
-		for {
-			n, err := recvReader.Read(buf)
-			if err != nil {
-				break
-			}
-			logRecv(buf[:n])
-		}
-		// Logf(10, "log done scanning recvs %s", name)
-	}()
-	go func() {
-		buf := make([]byte, 1024)
-		for {
-			n, err := sendReader.Read(buf)
-			if err != nil {
-				break
-			}
-			logSend(buf[:n])
-		}
-		// Logf(10, "log done scanning sends %s", name)
-	}()
-	return genericStream{
-		Reader:          io.TeeReader(stream, sendWriter),
-		Writer:          io.MultiWriter(stream, recvWriter),
-		CloseWriterFunc: stream.CloseWriter,
-		CloseFunc: func() error {
-			recvWriter.Close()
-			sendWriter.Close()
-			return stream.Close()
-		},
-	}
-}
-
-func NewLogStreamFactory(delegate StreamFactory) *LogStreamFactory {
-	return &LogStreamFactory{
-		StreamFactory: delegate,
-	}
-}
-
-func (f *LogStreamFactory) NewStream(name string) Stream {
-	stream := f.StreamFactory.NewStream(name)
-	return StreamWithLogging(
-		stream,
-		func(p []byte) {
-			Logf(0, "<-%s %s", name, strconv.Quote(string(p)))
-		},
-		func(p []byte) {
-			Logf(0, "->%s %s", name, strconv.Quote(string(p)))
-		},
-	)
 }
 
 type StdIOStreamFactory struct {
