@@ -48,7 +48,12 @@ func NewStdIOStreamFactory() *StdIOStreamFactory {
 	fanout := NewFanout()
 	go func() {
 		defer fanout.Close()
-		scanLines(os.Stdin, fanout)
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			if _, err := fanout.Write(scanner.Bytes()); err != nil {
+				return
+			}
+		}
 	}()
 	return &StdIOStreamFactory{
 		fanout: fanout,
@@ -62,17 +67,6 @@ func (f *StdIOStreamFactory) NewStream(name string) Stream {
 		Writer:    os.Stdout,
 		CloseFunc: rc.Close,
 	}
-}
-
-func scanLines(r io.Reader, w io.Writer) error {
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		_, err := w.Write(scanner.Bytes())
-		if err != nil {
-			return err
-		}
-	}
-	return scanner.Err()
 }
 
 type Fanout struct {
