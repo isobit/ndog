@@ -69,6 +69,10 @@ func ExtractOptions(cfg ndog.Config) (Options, error) {
 		opts.ServeFile = serveFileAbsPath
 	}
 
+	if val, ok := cfg.PopOption("fixed_response"); ok {
+		opts.FixedResponse = val
+	}
+
 	return opts, cfg.CheckRemainingOptions()
 }
 
@@ -108,6 +112,7 @@ func Listen(cfg ndog.Config) error {
 					ndog.Logf(-1, "error unmarshaling request body msgpack as JSON: %s", err)
 					return
 				}
+				io.WriteString(stream, "\n")
 			} else {
 				io.Copy(stream, r.Body)
 			}
@@ -121,7 +126,11 @@ func Listen(cfg ndog.Config) error {
 					w.Header().Add(key, val)
 				}
 				w.WriteHeader(opts.StatusCode)
+				if opts.FixedResponse != "" {
+					io.WriteString(w, opts.FixedResponse)
+				} else {
 					io.Copy(w, stream)
+				}
 			}
 		}),
 	}
