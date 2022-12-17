@@ -34,6 +34,7 @@ func main() {
 
 type Ndog struct {
 	Verbose  bool `cli:"short=v"`
+	Debug    bool
 	Quiet    bool `cli:"short=q"`
 	LogLevel int  `cli:"hidden"`
 
@@ -79,10 +80,12 @@ func (cmd Ndog) Run() error {
 		return cli.UsageErrorf("--verbose and --quiet are mutually exclusive")
 	case cmd.LogLevel != 0:
 		ndog.LogLevel = cmd.LogLevel
-	case cmd.Verbose:
-		ndog.LogLevel = 1
 	case cmd.Quiet:
 		ndog.LogLevel = -10
+	case cmd.Verbose:
+		ndog.LogLevel = 1
+	case cmd.Debug:
+		ndog.LogLevel = 10
 	}
 
 	var streamFactory ndog.StreamFactory
@@ -107,8 +110,8 @@ func (cmd Ndog) Run() error {
 	}
 
 	cfg := ndog.Config{
-		Options:       opts,
 		StreamFactory: streamFactory,
+		Options:       opts,
 	}
 
 	switch {
