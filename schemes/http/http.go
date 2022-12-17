@@ -24,41 +24,61 @@ var HTTPSScheme = &ndog.Scheme{
 	Connect: Connect,
 }
 
-func Listen(cfg ndog.Config) error {
-	writeRequestLine := false
-	if _, ok := cfg.Options["request_line"]; ok {
-		writeRequestLine = true
+type Options struct {
+	StatusCode       int
+	Headers          map[string]string
+	FixedResponse    string
+	ServeFile        string
+	WriteRequestLine bool
+	MsgpackToJSON    bool
+}
+
+func ExtractOptions(cfg ndog.Config) (Options, error) {
+	opts := Options{
+		StatusCode: 200,
+		Headers:    map[string]string{},
 	}
-	msgpackToJSON := false
-	if _, ok := cfg.Options["msgpack_to_json"]; ok {
-		msgpackToJSON = true
+	if _, ok := cfg.PopOption("request_line"); ok {
+		opts.WriteRequestLine = true
+	}
+	if _, ok := cfg.PopOption("msgpack_to_json"); ok {
+		opts.MsgpackToJSON = true
 	}
 
 	headerKeyPrefix := "header."
-	headers := map[string]string{}
 	for key, val := range cfg.Options {
 		if !strings.HasPrefix(key, headerKeyPrefix) {
 			continue
 		}
 		headerKey := strings.TrimPrefix(key, headerKeyPrefix)
-		headers[headerKey] = val
+		opts.Headers[headerKey] = val
+		delete(cfg.Options, key)
 	}
 
-	var statusCode int = 200
-	if statusCodeOption, ok := cfg.Options["status_code"]; ok {
-		if _, err := fmt.Sscanf(statusCodeOption, "%d", &statusCode); err != nil {
-			return fmt.Errorf("error parsing status_code option: %w", err)
+	if val, ok := cfg.Options["status_code"]; ok {
+		if _, err := fmt.Sscanf(val, "%d", &opts.StatusCode); err != nil {
+			return opts, fmt.Errorf("error parsing status_code option: %w", err)
 		}
 	}
 
-	var serveFile string
-	if serveFilePath, ok := cfg.Options["serve_file"]; ok {
+	if serveFilePath, ok := cfg.PopOption("serve_file"); ok {
 		serveFileAbsPath, err := filepath.Abs(serveFilePath)
 		if err != nil {
-			return fmt.Errorf("error parsing serve_file option: %w", err)
+			return opts, fmt.Errorf("error parsing serve_file option: %w", err)
 		}
-		serveFile = serveFileAbsPath
-		ndog.Logf(1, "http: will serve file(s) from %s", serveFile)
+		opts.ServeFile = serveFileAbsPath
+	}
+
+	return opts, cfg.CheckRemainingOptions()
+}
+
+func Listen(cfg ndog.Config) error {
+	opts, err := ExtractOptions(cfg)
+	if err != nil {
+		return err
+	}
+	if opts.ServeFile != "" {
+		ndog.Logf(1, "http: will serve file(s) from %s", opts.ServeFile)
 	}
 
 	s := &http.Server{
@@ -72,13 +92,13 @@ func Listen(cfg ndog.Config) error {
 			stream := cfg.NewStream(r.RemoteAddr)
 			defer stream.Close()
 
-			if writeRequestLine {
+			if opts.WriteRequestLine {
 				fmt.Fprintf(stream, "%s %s %s\n", r.Method, r.URL, r.Proto)
 			}
 
 			// Receive request.
 			contentType := r.Header.Get("Content-Type")
-			if msgpackToJSON && (contentType == "application/msgpack" || contentType == "application/x-msgpack") {
+			if opts.MsgpackToJSON && (contentType == "application/msgpack" || contentType == "application/x-msgpack") {
 				body, err := ioutil.ReadAll(r.Body)
 				if err != nil {
 					ndog.Logf(-1, "error reading request body: %s", err)
@@ -94,14 +114,14 @@ func Listen(cfg ndog.Config) error {
 			stream.CloseWriter()
 
 			// Send response.
-			if serveFile != "" {
-				http.ServeFile(w, r, filepath.Join(serveFile, r.URL.Path))
+			if opts.ServeFile != "" {
+				http.ServeFile(w, r, filepath.Join(opts.ServeFile, r.URL.Path))
 			} else {
-				for key, val := range headers {
+				for key, val := range opts.Headers {
 					w.Header().Add(key, val)
 				}
-				w.WriteHeader(statusCode)
-				io.Copy(w, stream)
+				w.WriteHeader(opts.StatusCode)
+					io.Copy(w, stream)
 			}
 		}),
 	}
