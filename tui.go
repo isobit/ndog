@@ -3,6 +3,7 @@ package ndog
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/isobit/tview"
@@ -78,7 +79,21 @@ func NewTUI(delegate StreamFactory) *TUI {
 	})
 
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
-		app.SetFocus(input)
+		ref, ok := node.GetReference().(treeNodeRef)
+		if !ok {
+			panic("node ref is not a treeNodeRef!")
+		}
+		if ref.w != nil {
+			app.SetFocus(input)
+		} else {
+			if node.IsExpanded() {
+				node.Collapse()
+				node.SetText(ref.name + " ▶")
+			} else {
+				node.Expand()
+				node.SetText(ref.name + " ▼")
+			}
+		}
 	})
 
 	getCurrentWriterCloser := func() (io.WriteCloser, bool) {
@@ -143,40 +158,94 @@ func NewTUI(delegate StreamFactory) *TUI {
 	}
 }
 
-func (tui *TUI) NewStream(name string) Stream {
-	node := tview.NewTreeNode(name).
-		SetSelectable(true)
+type treeNodeRef struct {
+	name string
+	w    io.WriteCloser
+}
 
+func (tui *TUI) NewStream(name string) Stream {
 	var res Stream
-	if tui.delegate != nil {
-		stream := tui.delegate.NewStream(name)
-		res = genericStream{
-			Reader:          stream,
-			Writer:          stream,
-			CloseWriterFunc: stream.CloseWriter,
-			CloseFunc: func() error {
-				tui.app.QueueUpdateDraw(func() {
-					tui.treeRoot.RemoveChild(node)
-				})
-				return stream.Close()
-			},
-		}
-	} else {
-		r, w := io.Pipe()
-		node.SetReference(w)
-		res = genericStream{
-			Reader: r,
-			Writer: io.Discard,
-			CloseFunc: func() error {
-				tui.app.QueueUpdateDraw(func() {
-					tui.treeRoot.RemoveChild(node)
-				})
-				return nil
-			},
-		}
-	}
+
+	path := strings.Split(name, "|")
+
 	tui.app.QueueUpdateDraw(func() {
-		tui.treeRoot.AddChild(node)
+		getOrAddChild := func(node *tview.TreeNode, ref treeNodeRef, text string) *tview.TreeNode {
+			for _, child := range node.GetChildren() {
+				if childRef, ok := child.GetReference().(treeNodeRef); ok {
+					if childRef.name == ref.name {
+						return child
+					}
+				}
+			}
+			child := tview.NewTreeNode(text).
+				SetReference(ref)
+			node.AddChild(child)
+			return child
+		}
+
+		var nodePath []*tview.TreeNode
+		var leafNode *tview.TreeNode = tui.treeRoot
+		var leafName string
+		nodePath = append(nodePath, leafNode)
+		for i, seg := range path {
+			ref := treeNodeRef{
+				name: seg,
+			}
+			text := seg
+			if i < len(path)-1 {
+				text += " ▼"
+			}
+			node := getOrAddChild(leafNode, ref, text)
+			nodePath = append(nodePath, node)
+			leafNode = node
+			leafName = seg
+		}
+
+		remove := func() {
+			for i := len(nodePath) - 2; i >= 0; i-- {
+				parent := nodePath[i]
+				child := nodePath[i+1]
+				childHasChildren := len(child.GetChildren()) > 0
+				if !childHasChildren {
+					parent.RemoveChild(child)
+				}
+			}
+		}
+
+		if tui.delegate != nil {
+			stream := tui.delegate.NewStream(name)
+			res = genericStream{
+				Reader:          stream,
+				Writer:          stream,
+				CloseWriterFunc: stream.CloseWriter,
+				CloseFunc: func() error {
+					tui.app.QueueUpdateDraw(func() {
+						Logf(10, "removing %s from tree", name)
+						remove()
+						// tui.treeRoot.RemoveChild(rootNode)
+					})
+					return stream.Close()
+				},
+			}
+		} else {
+			r, w := io.Pipe()
+			leafNode.SetReference(treeNodeRef{
+				name: leafName,
+				w:    w,
+			})
+			res = genericStream{
+				Reader: r,
+				Writer: io.Discard,
+				CloseFunc: func() error {
+					tui.app.QueueUpdateDraw(func() {
+						Logf(10, "removing %s from tree", name)
+						remove()
+						// tui.treeRoot.RemoveChild(node)
+					})
+					return nil
+				},
+			}
+		}
 	})
 	return res
 }
@@ -185,6 +254,9 @@ func (tui *TUI) Logf(level int, format string, v ...interface{}) (int, error) {
 	// if level > LogLevel {
 	// 	return 0, nil
 	// }
+	if level < 0 {
+		defaultLogf(level, format, v...)
+	}
 	if len(format) > 0 && format[len(format)-1] != '\n' {
 		format = format + "\n"
 	}
