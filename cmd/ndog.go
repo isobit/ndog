@@ -75,7 +75,6 @@ func (cmd Ndog) Run() error {
 		streamFactory = ndog.NewExecStreamFactory(args[0], args[1:]...)
 	}
 	if cmd.Interactive {
-		// ndog.LogLevel = -10
 		tui := ndog.NewTUI(streamFactory)
 		streamFactory = tui
 		originalLogf := ndog.Logf
