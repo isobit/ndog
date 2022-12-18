@@ -50,10 +50,11 @@ byte streams. Streams can be multiplexed together (e.g. when listening with no
 
 ## Examples
 
-| Description                                       | Incantation                    |
-| ---                                               | ---                            |
-| Start a TCP server on port 8000, all interfaces   | `ndog -l tcp://:8000`          |
-| Start a UDP server on port 8125, localhost        | `ndog -l udp://localhost:8125` |
-| Start an HTTP server on port 8080, all interfaces | `ndog -l http://:8080`         |
-| Connect to a TCP server on port 8000, localhost   | `ndog -c tcp://localhost:8000` |
-| Connect to a UDP server on port 8125, localhost   | `ndog -c udp://localhost:8000` |
+| Description                                          | Incantation                                     |
+| ---                                                  | ---                                             |
+| Start a TCP server on port 8000, all interfaces      | `ndog -l tcp://:8000`                           |
+| Start a UDP server on port 8125, localhost           | `ndog -l udp://localhost:8125`                  |
+| Start an HTTP server on port 8080, all interfaces    | `ndog -l http://:8080`                          |
+| Serve current directory file system over HTTP server | `ndog -l http://localhost:8080 -o serve_file=.` |
+| Connect to a TCP server on port 8000, localhost      | `ndog -c tcp://localhost:8000`                  |
+| Connect to a UDP server on port 8125, localhost      | `ndog -c udp://localhost:8000`                  |
