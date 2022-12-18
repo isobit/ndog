@@ -1,6 +1,7 @@
 package ndog
 
 import (
+	"bufio"
 	"os/exec"
 	"syscall"
 )
@@ -18,17 +19,32 @@ func execCommandStream(name string, args ...string) Stream {
 		panic(err)
 	}
 
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		panic(err)
+	}
+
 	Logf(10, "exec: starting: %s", cmd)
 	if err := cmd.Start(); err != nil {
 		panic(err)
 	}
 	Logf(10, "exec: started: %d", cmd.Process.Pid)
 
+	// Log stderr
+	go func() {
+		defer stderr.Close()
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			Logf(0, "exec: stderr: %d: %s", cmd.Process.Pid, scanner.Text())
+		}
+	}()
+
 	return genericStream{
 		Reader:          stdout,
 		Writer:          stdin,
 		CloseWriterFunc: stdin.Close,
 		CloseFunc: func() error {
+			defer stderr.Close()
 			Logf(10, "exec: closing stdin/stdout: %d", cmd.Process.Pid)
 			stdin.Close()
 			stdout.Close()
