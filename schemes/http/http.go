@@ -93,7 +93,7 @@ func Listen(cfg ndog.Config) error {
 				ndog.Logf(2, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
 
-			stream := cfg.NewStream(r.RemoteAddr)
+			stream := cfg.NewStream(fmt.Sprintf("%s|%s %s", r.RemoteAddr, r.Method, r.URL))
 			defer stream.Close()
 
 			if opts.WriteRequestLine {
@@ -132,6 +132,7 @@ func Listen(cfg ndog.Config) error {
 					io.Copy(w, stream)
 				}
 			}
+			ndog.Logf(10, "handler closed")
 		}),
 	}
 	ndog.Logf(0, "listening: %s", s.Addr)
