@@ -23,7 +23,6 @@ func main() {
 	}
 
 	err := cli.New("ndog", &Ndog{}).
-		SetDescription(description).
 		Parse().
 		Run()
 
@@ -47,28 +46,6 @@ type Ndog struct {
 
 	ListSchemes bool `cli:"help=list available schemes"`
 }
-
-var description string = `
-Examples:
-
-Start a TCP server on port 8000, all interfaces:
-  ndog -l tcp://:8000
-
-Start a UDP server on port 8125, localhost:
-  ndog -l udp://localhost:8125
-
-Start an HTTP server on port 8080, all interfaces:
-  ndog -l http://:8080
-
-Start an HTTP file server for the current directory on port 8080, localhost:
-  ndog -l http://localhost:8080 -o serve_file=.
-
-Connect to a TCP server on port 8000, localhost:
-  ndog -c tcp://localhost:8000
-
-Connect to a UDP server on port 8125, localhost:
-  ndog -c udp://localhost:8000
-`
 
 func (cmd Ndog) Run() error {
 	if cmd.ListSchemes {
