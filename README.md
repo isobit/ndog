@@ -1,6 +1,8 @@
 # ndog
 
-Ndog is like [Ncat](https://nmap.org/ncat/), but friendlier!
+Ndog is like [Ncat](https://nmap.org/ncat/), but friendlier! It is a networking
+multitool that can act as a client or server for a number of network
+schemes/protocols.
 
 :warning: This project is under active development and is subject to major
 breaking changes prior to the 1.0 release.
