@@ -36,13 +36,15 @@ type Ndog struct {
 	Debug    bool
 	Quiet    bool `cli:"short=q"`
 	LogLevel int  `cli:"hidden"`
+	Log      bool
 
 	ListenURL  *url.URL `cli:"name=listen,short=l,placeholder=URL"`
 	ConnectURL *url.URL `cli:"name=connect,short=c,placeholder=URL"`
 
-	Exec    string   `cli:"short=x,help=execute a command to handle streams"`
+	Exec string `cli:"short=x,help=execute a command to handle streams"`
+	Tee  bool   `cli:"short=t"`
+
 	Options []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
-	Log     bool
 
 	ListSchemes bool `cli:"help=list available schemes"`
 }
@@ -71,7 +73,11 @@ func (cmd Ndog) Run() error {
 		if err != nil {
 			return cli.UsageErrorf("failed to split exec args: %s", err)
 		}
-		streamFactory = ndog.NewExecStreamFactory(args[0], args[1:]...)
+		execStreamFactory := ndog.NewExecStreamFactory(args)
+		if cmd.Tee {
+			execStreamFactory.TeeWriter = os.Stdout
+		}
+		streamFactory = execStreamFactory
 	} else {
 		streamFactory = ndog.NewStdIOStreamFactory()
 	}

@@ -2,12 +2,26 @@ package ndog
 
 import (
 	"bufio"
+	"context"
+	"io"
 	"os/exec"
 	"syscall"
+	"time"
 )
 
-func execCommandStream(name string, args ...string) Stream {
-	cmd := exec.Command(name, args...)
+type ExecStreamFactory struct {
+	Args      []string
+	TeeWriter io.Writer
+}
+
+func NewExecStreamFactory(args []string) *ExecStreamFactory {
+	return &ExecStreamFactory{
+		Args: args,
+	}
+}
+
+func (f *ExecStreamFactory) NewStream(name string) Stream {
+	cmd := exec.Command(f.Args[0], f.Args[1:]...)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -39,41 +53,40 @@ func execCommandStream(name string, args ...string) Stream {
 		}
 	}()
 
+	var w io.Writer = stdin
+	if f.TeeWriter != nil {
+		w = io.MultiWriter(w, f.TeeWriter)
+	}
+
 	return genericStream{
-		Reader:          stdout,
-		Writer:          stdin,
-		CloseWriterFunc: stdin.Close,
+		Reader: stdout,
+		Writer: w,
+		CloseWriterFunc: func() error {
+			Logf(10, "exec: closing stdin: %d", cmd.Process.Pid)
+			return stdin.Close()
+		},
 		CloseFunc: func() error {
-			defer stderr.Close()
-			Logf(10, "exec: closing stdin/stdout: %d", cmd.Process.Pid)
-			stdin.Close()
-			stdout.Close()
 			Logf(10, "exec: terminating: %d", cmd.Process.Pid)
 			cmd.Process.Signal(syscall.SIGTERM)
-			// TODO kill after timeout
-			// cmd.Process.Kill()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			go func() {
+				select {
+				case <-time.After(10 * time.Second):
+					Logf(-1, "exec: termination timed out, killing: %d", cmd.Process.Pid)
+					cmd.Process.Kill()
+				case <-ctx.Done():
+				}
+			}()
+
 			Logf(10, "exec: waiting: %d", cmd.Process.Pid)
 			cmd.Wait()
+
 			Logf(10, "exec: exited: %d", cmd.Process.Pid)
 			return nil
 		},
 	}
-}
-
-type ExecStreamFactory struct {
-	Name string
-	Args []string
-}
-
-func NewExecStreamFactory(name string, args ...string) *ExecStreamFactory {
-	return &ExecStreamFactory{
-		Name: name,
-		Args: args,
-	}
-}
-
-func (f *ExecStreamFactory) NewStream(name string) Stream {
-	return execCommandStream(f.Name, f.Args...)
 }
 
 // type ExecTemplateStreamFactory struct {
