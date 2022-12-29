@@ -2,6 +2,7 @@ package ndog
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -41,32 +42,58 @@ func (rwc genericStream) Close() error {
 }
 
 type StdIOStreamFactory struct {
-	fanout *Fanout
+	readCloserFunc func() io.ReadCloser
 }
 
-func NewStdIOStreamFactory() *StdIOStreamFactory {
-	fanout := NewFanout()
-	go func() {
-		defer fanout.Close()
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			if _, err := fanout.Write(scanner.Bytes()); err != nil {
-				return
+func NewStdIOStreamFactory(fixedData []byte) *StdIOStreamFactory {
+	f := &StdIOStreamFactory{}
+
+	stdinStat, _ := os.Stdin.Stat()
+	if stdinStat.Mode()&os.ModeCharDevice == 0 {
+		fanout := FanoutStdin()
+		f.readCloserFunc = fanout.Tee
+	} else {
+		f.readCloserFunc = func() io.ReadCloser {
+			var buf bytes.Buffer
+			if fixedData != nil {
+				buf.Write(fixedData)
 			}
+			return io.NopCloser(&buf)
 		}
-	}()
-	return &StdIOStreamFactory{
-		fanout: fanout,
 	}
+
+	return f
 }
 
 func (f *StdIOStreamFactory) NewStream(name string) Stream {
-	rc := f.fanout.Tee()
+	rc := f.readCloserFunc()
 	return genericStream{
 		Reader:    rc,
 		Writer:    os.Stdout,
 		CloseFunc: rc.Close,
 	}
+}
+
+func FanoutStdin() *Fanout {
+	fanout := NewFanout()
+	go func() {
+		defer fanout.Close()
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			data := scanner.Bytes()
+			Logf(10, "stdin data: %s", data)
+			if _, err := fanout.Write(data); err != nil {
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			Logf(-1, "stdin scan error: %s", err)
+		} else {
+			Logf(10, "stdin EOF")
+		}
+		// os.Exit(1) // TODO clean shutdown
+	}()
+	return fanout
 }
 
 type Fanout struct {
@@ -80,6 +107,14 @@ func NewFanout() *Fanout {
 	return &Fanout{
 		writers: []io.WriteCloser{},
 		wakeCh:  make(chan bool),
+	}
+}
+
+func (f *Fanout) CloseWriters() {
+	f.Lock()
+	defer f.Unlock()
+	for _, w := range f.writers {
+		w.Close()
 	}
 }
 

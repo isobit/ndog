@@ -44,6 +44,8 @@ type Ndog struct {
 	Exec string `cli:"short=x,help=execute a command to handle streams"`
 	Tee  bool   `cli:"short=t"`
 
+	FixedInput string `cli:"short=F"`
+
 	Options []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
 
 	ListSchemes bool `cli:"help=list available schemes"`
@@ -79,7 +81,7 @@ func (cmd Ndog) Run() error {
 		}
 		streamFactory = execStreamFactory
 	} else {
-		streamFactory = ndog.NewStdIOStreamFactory()
+		streamFactory = ndog.NewStdIOStreamFactory([]byte(cmd.FixedInput))
 	}
 	if cmd.Log {
 		streamFactory = ndog.NewLogStreamFactory(streamFactory)
