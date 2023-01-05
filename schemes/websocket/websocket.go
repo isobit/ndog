@@ -62,8 +62,6 @@ func Connect(cfg ndog.ConnectConfig) error {
 	remoteAddr := conn.RemoteAddr()
 	ndog.Logf(0, "connected: %s", remoteAddr)
 
-	// stream := cfg.NewStream(remoteAddr.String())
-	// defer stream.Close()
 	stream := cfg.Stream
 
 	go io.Copy(conn, stream)

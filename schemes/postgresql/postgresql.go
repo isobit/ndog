@@ -47,8 +47,6 @@ func Connect(cfg ndog.ConnectConfig) error {
 	name := fmt.Sprintf("%s:%d", cc.Host, cc.Port)
 	ndog.Logf(0, "connected: %s", name)
 
-	// stream := cfg.StreamFactory.NewStream(name)
-	// defer stream.Close()
 	stream := cfg.Stream
 
 	scanner := bufio.NewScanner(stream)

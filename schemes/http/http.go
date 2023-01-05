@@ -1,7 +1,6 @@
 package http
 
 import (
-	// "bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -147,14 +146,12 @@ type Request struct {
 	URL     string
 	Headers map[string][]string
 	Body    string
-	// Body    []byte
 }
 
 type Response struct {
 	StatusCode int
 	Headers    map[string][]string
 	Body       string
-	// Body       []byte
 }
 
 func jsonHandler(stream ndog.Stream, w http.ResponseWriter, r *http.Request) {
@@ -197,8 +194,6 @@ func jsonHandler(stream ndog.Stream, w http.ResponseWriter, r *http.Request) {
 
 func Connect(cfg ndog.ConnectConfig) error {
 	ndog.Logf(0, "request: GET %s", cfg.URL.RequestURI())
-	// stream := cfg.NewStream("")
-	// defer stream.Close()
 
 	stream := cfg.Stream
 	// body not supported yet, need option for non-GET methods
@@ -219,50 +214,3 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 	return nil
 }
-
-// func ConnectJSON(cfg ndog.Config) error {
-// 	stream := cfg.NewStream("")
-// 	defer stream.Close()
-
-// 	req, err := ndog.ReadJSON[Request](stream)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	var url string = cfg.URL.String()
-// 	if req.URL != "" {
-// 		url = req.URL
-// 	}
-
-// 	httpReq, err := http.NewRequest(
-// 		req.Method,
-// 		url,
-// 		bytes.NewBufferString(req.Body),
-// 	)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	ndog.Logf(0, "request: %s %s", httpReq.Method, httpReq.URL)
-// 	res, err := http.DefaultClient.Do(httpReq)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	body, err := ioutil.ReadAll(res.Body)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if err := ndog.WriteJSON(stream, Response{
-// 		StatusCode: res.StatusCode,
-// 		Headers: res.Header,
-// 		Body: string(body),
-// 	}); err != nil {
-// 		return err
-// 	}
-
-// 	if res.StatusCode >= 400 {
-// 		return fmt.Errorf("got error response: %s", res.Status)
-// 	}
-// 	return nil
-// }

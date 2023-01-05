@@ -139,11 +139,6 @@ func (cmd Ndog) Run() error {
 
 	switch {
 	case listenScheme != nil:
-		// return listenScheme.Listen(ndog.Config{
-		// 	StreamFactory: streamFactory,
-		// 	Options:       opts,
-		// 	URL:           cmd.ListenURL,
-		// })
 		return listenScheme.Listen(ndog.ListenConfig{
 			Config: ndog.Config{
 				URL:     cmd.ListenURL,
@@ -152,11 +147,6 @@ func (cmd Ndog) Run() error {
 			StreamFactory: streamFactory,
 		})
 	case connectScheme != nil:
-		// return connectScheme.Connect(ndog.Config{
-		// 	StreamFactory: streamFactory,
-		// 	Options:       opts,
-		// 	URL:           cmd.ConnectURL,
-		// })
 		stream := streamFactory.NewStream("") // TODO name
 		return connectScheme.Connect(ndog.ConnectConfig{
 			Config: ndog.Config{
