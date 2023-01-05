@@ -14,7 +14,7 @@ var Scheme = &ndog.Scheme{
 	Listen:  Listen,
 }
 
-func Listen(cfg ndog.Config) error {
+func Listen(cfg ndog.ListenConfig) error {
 	addr, err := net.ResolveTCPAddr("tcp", cfg.URL.Host)
 	if err != nil {
 		return fmt.Errorf("invalid address: %w", err)
@@ -32,7 +32,7 @@ func Listen(cfg ndog.Config) error {
 
 		remoteAddr := conn.RemoteAddr()
 
-		stream := cfg.NewStream(remoteAddr.String())
+		stream := cfg.StreamFactory.NewStream(remoteAddr.String())
 		defer stream.Close()
 		go io.Copy(conn, stream)
 
@@ -67,7 +67,7 @@ func Listen(cfg ndog.Config) error {
 	}
 }
 
-func Connect(cfg ndog.Config) error {
+func Connect(cfg ndog.ConnectConfig) error {
 	addr, err := net.ResolveTCPAddr("tcp", cfg.URL.Host)
 	if err != nil {
 		return fmt.Errorf("invalid address: %w", err)
@@ -82,12 +82,22 @@ func Connect(cfg ndog.Config) error {
 	remoteAddr := conn.RemoteAddr()
 	ndog.Logf(0, "connected: %s", remoteAddr)
 
-	stream := cfg.NewStream(remoteAddr.String())
-	defer stream.Close()
+	// stream := cfg.NewStream(remoteAddr.String())
+	// defer stream.Close()
+	stream := cfg.Stream
 
 	go io.Copy(conn, stream)
 	_, err = io.Copy(stream, conn)
 
 	ndog.Logf(0, "closed: %s", remoteAddr)
 	return err
+}
+
+type Request struct {
+	RemoteAddr string
+	Data       []byte
+}
+
+type Response struct {
+	Data []byte
 }

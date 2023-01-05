@@ -3,6 +3,7 @@ package ndog
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -48,8 +49,7 @@ type StdIOStreamFactory struct {
 func NewStdIOStreamFactory(fixedData []byte) *StdIOStreamFactory {
 	f := &StdIOStreamFactory{}
 
-	stdinStat, _ := os.Stdin.Stat()
-	if stdinStat.Mode()&os.ModeCharDevice == 0 {
+	if fixedData == nil {
 		fanout := FanoutStdin()
 		f.readCloserFunc = fanout.Tee
 	} else {
@@ -168,4 +168,27 @@ func (f *Fanout) Tee() io.ReadCloser {
 	}
 
 	return pr
+}
+
+func ReadJSON[T any](stream Stream) (*T, error) {
+	readData, err := io.ReadAll(stream)
+	if err != nil {
+		return nil, err
+	}
+	var v T
+	if err := json.Unmarshal(readData, &v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func WriteJSON[T any](stream Stream, v T) error {
+	writeData, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	stream.Write(writeData)
+	io.WriteString(stream, "\n")
+	stream.CloseWriter()
+	return nil
 }

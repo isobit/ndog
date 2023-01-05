@@ -2,7 +2,6 @@ package postgresql
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,33 +18,20 @@ var Scheme = &ndog.Scheme{
 	Connect: Connect,
 }
 
-func splitStatements(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	if atEOF {
-		if len(data) == 0 {
-			return 0, nil, nil
-		}
-		return len(data), data, nil
-	}
-	if i := bytes.IndexByte(data, ';'); i >= 0 {
-		return i + 1, data[:i+1], nil
-	}
-	return 0, nil, nil
-}
-
 type Options struct {
 	JSON bool
 }
 
-func ExtractOptions(cfg ndog.Config) (Options, error) {
-	opts := Options{}
-	if _, ok := cfg.PopOption("json"); ok {
-		opts.JSON = true
+func extractOptions(opts ndog.Options) (Options, error) {
+	o := Options{}
+	if _, ok := opts.Pop("json"); ok {
+		o.JSON = true
 	}
-	return opts, cfg.CheckRemainingOptions()
+	return o, opts.Done()
 }
 
-func Connect(cfg ndog.Config) error {
-	opts, err := ExtractOptions(cfg)
+func Connect(cfg ndog.ConnectConfig) error {
+	opts, err := extractOptions(cfg.Options)
 	if err != nil {
 		return err
 	}
@@ -61,8 +47,9 @@ func Connect(cfg ndog.Config) error {
 	name := fmt.Sprintf("%s:%d", cc.Host, cc.Port)
 	ndog.Logf(0, "connected: %s", name)
 
-	stream := cfg.NewStream(name)
-	defer stream.Close()
+	// stream := cfg.StreamFactory.NewStream(name)
+	// defer stream.Close()
+	stream := cfg.Stream
 
 	scanner := bufio.NewScanner(stream)
 	scanner.Split(splitStatements)
@@ -71,15 +58,16 @@ func Connect(cfg ndog.Config) error {
 		ndog.Logf(1, "execute: %s", strconv.Quote(stmt))
 		rows, err := conn.Query(ctx, stmt)
 		if err != nil {
-			return err
+			ndog.Logf(-1, "error executing query: %s", err)
+			continue
 		}
 		if opts.JSON {
 			if err := rowsToJSON(stream, rows); err != nil {
-				return err
+				ndog.Logf(-1, "error converting rows to JSON: %s", err)
 			}
 		} else {
 			if err := rowsToCSV(stream, rows); err != nil {
-				return err
+				ndog.Logf(-1, "error converting rows to CSV: %s", err)
 			}
 		}
 	}
@@ -142,4 +130,31 @@ func rowsToCSV(w io.Writer, rows pgx.Rows) error {
 		fmt.Fprintf(w, "\n")
 	}
 	return nil
+}
+
+func splitStatements(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF {
+		if len(data) == 0 {
+			return 0, nil, nil
+		}
+		return len(data), data, nil
+	}
+	inEscape := false
+	inString := false
+	for i, b := range data {
+		if inEscape {
+			inEscape = false
+			continue
+		}
+		switch {
+		case b == '\\':
+			inEscape = true
+		case b == '\'':
+			inString = !inString
+		case b == ';' && !inString:
+			return i + 1, data[:i], nil
+		}
+	}
+	// request more data
+	return 0, nil, nil
 }

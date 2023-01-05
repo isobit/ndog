@@ -1,6 +1,7 @@
 package http
 
 import (
+	// "bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,57 +28,57 @@ var HTTPSScheme = &ndog.Scheme{
 type Options struct {
 	StatusCode       int
 	Headers          map[string]string
-	FixedResponse    string
 	ServeFile        string
 	WriteRequestLine bool
 	MsgpackToJSON    bool
+	JSON             bool
 }
 
-func ExtractOptions(cfg ndog.Config) (Options, error) {
-	opts := Options{
+func extractOptions(opts ndog.Options) (Options, error) {
+	o := Options{
 		StatusCode: 200,
 		Headers:    map[string]string{},
 	}
-	if _, ok := cfg.PopOption("request_line"); ok {
-		opts.WriteRequestLine = true
+	if _, ok := opts.Pop("request_line"); ok {
+		o.WriteRequestLine = true
 	}
-	if _, ok := cfg.PopOption("msgpack_to_json"); ok {
-		opts.MsgpackToJSON = true
+	if _, ok := opts.Pop("msgpack_to_json"); ok {
+		o.MsgpackToJSON = true
+	}
+
+	if val, ok := opts.Pop("status_code"); ok {
+		if _, err := fmt.Sscanf(val, "%d", &val); err != nil {
+			return o, fmt.Errorf("error parsing status_code option: %w", err)
+		}
+	}
+
+	if serveFilePath, ok := opts.Pop("serve_file"); ok {
+		serveFileAbsPath, err := filepath.Abs(serveFilePath)
+		if err != nil {
+			return o, fmt.Errorf("error parsing serve_file option: %w", err)
+		}
+		o.ServeFile = serveFileAbsPath
+	}
+
+	if _, ok := opts.Pop("json"); ok {
+		o.JSON = true
 	}
 
 	headerKeyPrefix := "header."
-	for key, val := range cfg.Options {
+	for key, val := range opts {
 		if !strings.HasPrefix(key, headerKeyPrefix) {
 			continue
 		}
 		headerKey := strings.TrimPrefix(key, headerKeyPrefix)
-		opts.Headers[headerKey] = val
-		delete(cfg.Options, key)
+		o.Headers[headerKey] = val
+		delete(opts, key)
 	}
 
-	if val, ok := cfg.Options["status_code"]; ok {
-		if _, err := fmt.Sscanf(val, "%d", &opts.StatusCode); err != nil {
-			return opts, fmt.Errorf("error parsing status_code option: %w", err)
-		}
-	}
-
-	if serveFilePath, ok := cfg.PopOption("serve_file"); ok {
-		serveFileAbsPath, err := filepath.Abs(serveFilePath)
-		if err != nil {
-			return opts, fmt.Errorf("error parsing serve_file option: %w", err)
-		}
-		opts.ServeFile = serveFileAbsPath
-	}
-
-	if val, ok := cfg.PopOption("fixed_response"); ok {
-		opts.FixedResponse = val
-	}
-
-	return opts, cfg.CheckRemainingOptions()
+	return o, opts.Done()
 }
 
-func Listen(cfg ndog.Config) error {
-	opts, err := ExtractOptions(cfg)
+func Listen(cfg ndog.ListenConfig) error {
+	opts, err := extractOptions(cfg.Options)
 	if err != nil {
 		return err
 	}
@@ -92,9 +93,18 @@ func Listen(cfg ndog.Config) error {
 			for key, values := range r.Header {
 				ndog.Logf(2, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
+			if opts.ServeFile != "" {
+				http.ServeFile(w, r, filepath.Join(opts.ServeFile, r.URL.Path))
+				return
+			}
 
-			stream := cfg.NewStream(fmt.Sprintf("%s|%s %s", r.RemoteAddr, r.Method, r.URL))
+			stream := cfg.StreamFactory.NewStream(fmt.Sprintf("%s|%s %s", r.RemoteAddr, r.Method, r.URL))
 			defer stream.Close()
+
+			if opts.JSON {
+				jsonHandler(stream, w, r)
+				return
+			}
 
 			if opts.WriteRequestLine {
 				fmt.Fprintf(stream, "%s %s %s\n", r.Method, r.URL, r.Proto)
@@ -119,19 +129,11 @@ func Listen(cfg ndog.Config) error {
 			stream.CloseWriter()
 
 			// Send response.
-			if opts.ServeFile != "" {
-				http.ServeFile(w, r, filepath.Join(opts.ServeFile, r.URL.Path))
-			} else {
-				for key, val := range opts.Headers {
-					w.Header().Add(key, val)
-				}
-				w.WriteHeader(opts.StatusCode)
-				if opts.FixedResponse != "" {
-					io.WriteString(w, opts.FixedResponse)
-				} else {
-					io.Copy(w, stream)
-				}
+			for key, val := range opts.Headers {
+				w.Header().Add(key, val)
 			}
+			w.WriteHeader(opts.StatusCode)
+			io.Copy(w, stream)
 			ndog.Logf(10, "handler closed")
 		}),
 	}
@@ -139,10 +141,69 @@ func Listen(cfg ndog.Config) error {
 	return s.ListenAndServe()
 }
 
-func Connect(cfg ndog.Config) error {
+type Request struct {
+	Proto   string
+	Method  string
+	URL     string
+	Headers map[string][]string
+	Body    string
+	// Body    []byte
+}
+
+type Response struct {
+	StatusCode int
+	Headers    map[string][]string
+	Body       string
+	// Body       []byte
+}
+
+func jsonHandler(stream ndog.Stream, w http.ResponseWriter, r *http.Request) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		ndog.Logf(-1, "error reading request body: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	if err := ndog.WriteJSON(stream, Request{
+		Proto:   r.Proto,
+		Method:  r.Method,
+		URL:     r.URL.String(),
+		Headers: r.Header,
+		Body:    string(body),
+	}); err != nil {
+		ndog.Logf(-1, "error writing request JSON: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	resp, err := ndog.ReadJSON[Response](stream)
+	if err != nil {
+		ndog.Logf(-1, "error reading response JSON: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	header := w.Header()
+	for key, vals := range resp.Headers {
+		for _, val := range vals {
+			header.Add(key, val)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	io.WriteString(w, resp.Body)
+	ndog.Logf(10, "handler closed")
+}
+
+func Connect(cfg ndog.ConnectConfig) error {
 	ndog.Logf(0, "request: GET %s", cfg.URL.RequestURI())
-	stream := cfg.NewStream("")
-	defer stream.Close()
+	// stream := cfg.NewStream("")
+	// defer stream.Close()
+
+	stream := cfg.Stream
+	// body not supported yet, need option for non-GET methods
+	io.Copy(io.Discard, stream)
+
 	resp, err := http.Get(cfg.URL.String())
 	if err != nil {
 		return err
@@ -158,3 +219,50 @@ func Connect(cfg ndog.Config) error {
 	}
 	return nil
 }
+
+// func ConnectJSON(cfg ndog.Config) error {
+// 	stream := cfg.NewStream("")
+// 	defer stream.Close()
+
+// 	req, err := ndog.ReadJSON[Request](stream)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	var url string = cfg.URL.String()
+// 	if req.URL != "" {
+// 		url = req.URL
+// 	}
+
+// 	httpReq, err := http.NewRequest(
+// 		req.Method,
+// 		url,
+// 		bytes.NewBufferString(req.Body),
+// 	)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	ndog.Logf(0, "request: %s %s", httpReq.Method, httpReq.URL)
+// 	res, err := http.DefaultClient.Do(httpReq)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	body, err := ioutil.ReadAll(res.Body)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	if err := ndog.WriteJSON(stream, Response{
+// 		StatusCode: res.StatusCode,
+// 		Headers: res.Header,
+// 		Body: string(body),
+// 	}); err != nil {
+// 		return err
+// 	}
+
+// 	if res.StatusCode >= 400 {
+// 		return fmt.Errorf("got error response: %s", res.Status)
+// 	}
+// 	return nil
+// }
