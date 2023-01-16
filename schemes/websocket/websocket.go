@@ -28,7 +28,7 @@ func Listen(cfg ndog.ListenConfig) error {
 				stream := cfg.StreamFactory.NewStream(r.RemoteAddr)
 				defer stream.Close()
 
-				go io.Copy(conn, stream)
+				go io.Copy(conn, stream.Reader)
 
 				buf := make([]byte, 1024)
 				for {
@@ -38,7 +38,7 @@ func Listen(cfg ndog.ListenConfig) error {
 					}
 					ndog.Logf(2, "read: %d bytes from %s", nr, r.RemoteAddr)
 
-					_, err = stream.Write(buf[:nr])
+					_, err = stream.Writer.Write(buf[:nr])
 					if err != nil {
 						return
 					}
@@ -64,8 +64,8 @@ func Connect(cfg ndog.ConnectConfig) error {
 
 	stream := cfg.Stream
 
-	go io.Copy(conn, stream)
-	_, err = io.Copy(stream, conn)
+	go io.Copy(conn, stream.Reader)
+	_, err = io.Copy(stream.Writer, conn)
 
 	ndog.Logf(0, "closed: %s", remoteAddr)
 	return err

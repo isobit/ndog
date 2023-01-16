@@ -10,36 +10,19 @@ import (
 	"sync"
 )
 
-type Stream interface {
-	io.ReadWriteCloser
-	CloseWriter() error
+type Stream struct {
+	Reader io.ReadCloser
+	Writer io.WriteCloser
+}
+
+func (stream Stream) Close() error {
+	stream.Reader.Close()
+	stream.Writer.Close()
+	return nil
 }
 
 type StreamFactory interface {
 	NewStream(name string) Stream
-}
-
-type genericStream struct {
-	io.Reader
-	io.Writer
-	CloseWriterFunc func() error
-	CloseFunc       func() error
-}
-
-var _ Stream = genericStream{}
-
-func (rwc genericStream) CloseWriter() error {
-	if rwc.CloseWriterFunc == nil {
-		return nil
-	}
-	return rwc.CloseWriterFunc()
-}
-
-func (rwc genericStream) Close() error {
-	if rwc.CloseFunc == nil {
-		return nil
-	}
-	return rwc.CloseFunc()
 }
 
 type StdIOStreamFactory struct {
@@ -67,10 +50,9 @@ func NewStdIOStreamFactory(fixedData []byte) *StdIOStreamFactory {
 
 func (f *StdIOStreamFactory) NewStream(name string) Stream {
 	rc := f.readCloserFunc()
-	return genericStream{
-		Reader:    rc,
-		Writer:    os.Stdout,
-		CloseFunc: rc.Close,
+	return Stream{
+		Reader: rc,
+		Writer: os.Stdout,
 	}
 }
 
@@ -171,7 +153,7 @@ func (f *Fanout) Tee() io.ReadCloser {
 }
 
 func ReadJSON[T any](stream Stream) (*T, error) {
-	readData, err := io.ReadAll(stream)
+	readData, err := io.ReadAll(stream.Reader)
 	if err != nil {
 		return nil, err
 	}
@@ -187,8 +169,64 @@ func WriteJSON[T any](stream Stream, v T) error {
 	if err != nil {
 		return err
 	}
-	stream.Write(writeData)
-	io.WriteString(stream, "\n")
-	stream.CloseWriter()
+	w := stream.Writer
+	w.Write(writeData)
+	io.WriteString(w, "\n")
+	w.Close()
 	return nil
+}
+
+type funcReadCloser struct {
+	io.Reader
+	closeFunc func() error
+}
+
+func (frc funcReadCloser) Close() error {
+	return frc.closeFunc()
+}
+
+func FuncReadCloser(r io.Reader, f func() error) io.ReadCloser {
+	return funcReadCloser{
+		Reader:    r,
+		closeFunc: f,
+	}
+}
+
+func TeeReadCloser(r io.ReadCloser, w io.WriteCloser) io.ReadCloser {
+	tr := io.TeeReader(r, w)
+	return FuncReadCloser(tr, func() error {
+		r.Close()
+		w.Close()
+		return nil
+	})
+}
+
+type funcWriteCloser struct {
+	io.Writer
+	closeFunc func() error
+}
+
+func (frc funcWriteCloser) Close() error {
+	return frc.closeFunc()
+}
+
+func FuncWriteCloser(w io.Writer, f func() error) io.WriteCloser {
+	return funcWriteCloser{
+		Writer:    w,
+		closeFunc: f,
+	}
+}
+
+func MultiWriteCloser(writerClosers ...io.WriteCloser) io.WriteCloser {
+	var writers []io.Writer
+	for _, wc := range writerClosers {
+		writers = append(writers, wc)
+	}
+	w := io.MultiWriter(writers...)
+	return FuncWriteCloser(w, func() error {
+		for _, wc := range writerClosers {
+			wc.Close()
+		}
+		return nil
+	})
 }

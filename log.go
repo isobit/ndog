@@ -78,14 +78,8 @@ func streamWithLogging(stream Stream, logRecv func([]byte), logSend func([]byte)
 		}
 		// Logf(10, "log done scanning sends %s", name)
 	}()
-	return genericStream{
-		Reader:          io.TeeReader(stream, sendWriter),
-		Writer:          io.MultiWriter(stream, recvWriter),
-		CloseWriterFunc: stream.CloseWriter,
-		CloseFunc: func() error {
-			recvWriter.Close()
-			sendWriter.Close()
-			return stream.Close()
-		},
+	return Stream{
+		Reader: TeeReadCloser(stream.Reader, sendWriter),
+		Writer: MultiWriteCloser(stream.Writer, recvWriter),
 	}
 }

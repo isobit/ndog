@@ -106,7 +106,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			}
 
 			if opts.WriteRequestLine {
-				fmt.Fprintf(stream, "%s %s %s\n", r.Method, r.URL, r.Proto)
+				fmt.Fprintf(stream.Writer, "%s %s %s\n", r.Method, r.URL, r.Proto)
 			}
 
 			// Receive request.
@@ -117,22 +117,22 @@ func Listen(cfg ndog.ListenConfig) error {
 					ndog.Logf(-1, "error reading request body: %s", err)
 					return
 				}
-				if _, err := msgp.UnmarshalAsJSON(stream, body); err != nil {
+				if _, err := msgp.UnmarshalAsJSON(stream.Writer, body); err != nil {
 					ndog.Logf(-1, "error unmarshaling request body msgpack as JSON: %s", err)
 					return
 				}
-				io.WriteString(stream, "\n")
+				io.WriteString(stream.Writer, "\n")
 			} else {
-				io.Copy(stream, r.Body)
+				io.Copy(stream.Writer, r.Body)
 			}
-			stream.CloseWriter()
+			stream.Writer.Close()
 
 			// Send response.
 			for key, val := range opts.Headers {
 				w.Header().Add(key, val)
 			}
 			w.WriteHeader(opts.StatusCode)
-			io.Copy(w, stream)
+			io.Copy(w, stream.Reader)
 			ndog.Logf(10, "handler closed")
 		}),
 	}
@@ -233,7 +233,7 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	// Convert to HTTP request
-	httpReq, err := http.NewRequest(opts.Method, cfg.URL.String(), cfg.Stream)
+	httpReq, err := http.NewRequest(opts.Method, cfg.URL.String(), cfg.Stream.Reader)
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func Connect(cfg ndog.ConnectConfig) error {
 	for key, values := range resp.Header {
 		ndog.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
 	}
-	if _, err := io.Copy(cfg.Stream, resp.Body); err != nil {
+	if _, err := io.Copy(cfg.Stream.Writer, resp.Body); err != nil {
 		return err
 	}
 

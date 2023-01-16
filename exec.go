@@ -10,8 +10,8 @@ import (
 )
 
 type ExecStreamFactory struct {
-	Args      []string
-	TeeWriter io.Writer
+	Args           []string
+	TeeWriteCloser io.WriteCloser
 }
 
 func NewExecStreamFactory(args []string) *ExecStreamFactory {
@@ -53,39 +53,53 @@ func (f *ExecStreamFactory) NewStream(name string) Stream {
 		}
 	}()
 
-	var w io.Writer = stdin
-	if f.TeeWriter != nil {
-		w = io.MultiWriter(w, f.TeeWriter)
+	var w io.WriteCloser = stdin
+	if f.TeeWriteCloser != nil {
+		w = MultiWriteCloser(w, f.TeeWriteCloser)
 	}
 
-	return genericStream{
-		Reader: stdout,
-		Writer: w,
-		CloseWriterFunc: func() error {
+	shutdownCh := make(chan bool)
+	go func() {
+		// Wait for reader and writer to be closed.
+		<-shutdownCh
+		<-shutdownCh
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		go func() {
+			select {
+			case <-time.After(10 * time.Second):
+				Logf(10, "exec: terminating: %d", cmd.Process.Pid)
+				cmd.Process.Signal(syscall.SIGTERM)
+			case <-ctx.Done():
+				return
+			}
+
+			select {
+			case <-time.After(10 * time.Second):
+				Logf(-1, "exec: termination timed out, killing: %d", cmd.Process.Pid)
+				cmd.Process.Kill()
+			case <-ctx.Done():
+				return
+			}
+		}()
+
+		Logf(10, "exec: waiting: %d", cmd.Process.Pid)
+		cmd.Wait()
+		Logf(10, "exec: exited: %d", cmd.Process.Pid)
+	}()
+
+	return Stream{
+		Reader: FuncReadCloser(stdout, func() error {
+			shutdownCh <- true
+			return stdout.Close()
+		}),
+		Writer: FuncWriteCloser(w, func() error {
+			shutdownCh <- true
 			Logf(10, "exec: closing stdin: %d", cmd.Process.Pid)
-			return stdin.Close()
-		},
-		CloseFunc: func() error {
-			Logf(10, "exec: terminating: %d", cmd.Process.Pid)
-			cmd.Process.Signal(syscall.SIGTERM)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			go func() {
-				select {
-				case <-time.After(10 * time.Second):
-					Logf(-1, "exec: termination timed out, killing: %d", cmd.Process.Pid)
-					cmd.Process.Kill()
-				case <-ctx.Done():
-				}
-			}()
-
-			Logf(10, "exec: waiting: %d", cmd.Process.Pid)
-			cmd.Wait()
-
-			Logf(10, "exec: exited: %d", cmd.Process.Pid)
-			return nil
-		},
+			return w.Close()
+		}),
 	}
 }
 

@@ -49,7 +49,7 @@ func Connect(cfg ndog.ConnectConfig) error {
 
 	stream := cfg.Stream
 
-	scanner := bufio.NewScanner(stream)
+	scanner := bufio.NewScanner(stream.Reader)
 	scanner.Split(splitStatements)
 	for scanner.Scan() {
 		stmt := scanner.Text()
@@ -60,11 +60,11 @@ func Connect(cfg ndog.ConnectConfig) error {
 			continue
 		}
 		if opts.JSON {
-			if err := rowsToJSON(stream, rows); err != nil {
+			if err := rowsToJSON(stream.Writer, rows); err != nil {
 				ndog.Logf(-1, "error converting rows to JSON: %s", err)
 			}
 		} else {
-			if err := rowsToCSV(stream, rows); err != nil {
+			if err := rowsToCSV(stream.Writer, rows); err != nil {
 				ndog.Logf(-1, "error converting rows to CSV: %s", err)
 			}
 		}

@@ -47,12 +47,13 @@ func Listen(cfg ndog.ListenConfig) error {
 		} else {
 			ndog.Logf(10, "creating new stream: %s", remoteAddrStr)
 			stream = cfg.StreamFactory.NewStream(remoteAddrStr)
-			// TODO close stream
+			// TODO close stream reader on timeout
 			streams[remoteAddrStr] = stream
-			go io.Copy(newUDPWriter(conn, remoteAddr), stream)
+			go io.Copy(newUDPWriter(conn, remoteAddr), stream.Reader)
 		}
 
-		_, err = stream.Write(buf[:nr])
+		// TODO close stream writer on timeout
+		_, err = stream.Writer.Write(buf[:nr])
 		if err != nil {
 			return err
 		}
@@ -92,8 +93,8 @@ func Connect(cfg ndog.ConnectConfig) error {
 
 	stream := cfg.Stream
 
-	go io.Copy(conn, stream)
-	_, err = io.Copy(stream, conn)
+	go io.Copy(conn, stream.Reader)
+	_, err = io.Copy(stream.Writer, conn)
 
 	ndog.Logf(0, "closed: %s", remoteAddr)
 	return err

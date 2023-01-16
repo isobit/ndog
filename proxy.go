@@ -15,27 +15,27 @@ func (f ProxyStreamFactory) NewStream(name string) Stream {
 	listenReader, listenWriter := io.Pipe()
 	connectReader, connectWriter := io.Pipe()
 
-	listenStream := genericStream{
-		Reader:          connectReader,
-		Writer:          listenWriter,
-		CloseWriterFunc: listenWriter.Close,
-		CloseFunc: func() error {
-			Logf(10, "closing proxy listen stream: %s", name)
-			return listenWriter.Close()
-		},
+	listenStream := Stream{
+		Reader: connectReader,
+		Writer: listenWriter,
+		// CloseWriterFunc: listenWriter.Close,
+		// CloseFunc: func() error {
+		// 	Logf(10, "closing proxy listen stream: %s", name)
+		// 	return listenWriter.Close()
+		// },
 	}
-	connectStream := genericStream{
-		Reader:          listenReader,
-		Writer:          connectWriter,
-		CloseWriterFunc: connectWriter.Close,
-		CloseFunc: func() error {
-			Logf(10, "closing proxy connect stream: %s", name)
-			return connectWriter.Close()
-		},
+	connectStream := Stream{
+		Reader: listenReader,
+		Writer: connectWriter,
+		// CloseWriterFunc: connectWriter.Close,
+		// CloseFunc: func() error {
+		// 	Logf(10, "closing proxy connect stream: %s", name)
+		// 	return connectWriter.Close()
+		// },
 	}
 
 	go func() {
-		defer connectStream.Close()
+		defer connectWriter.Close()
 		cfg := ConnectConfig{
 			Config: f.ConnectConfig,
 			Stream: connectStream,
