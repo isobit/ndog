@@ -41,12 +41,11 @@ type Ndog struct {
 	ListenURL  *url.URL `cli:"name=listen,short=l,placeholder=URL"`
 	ConnectURL *url.URL `cli:"name=connect,short=c,placeholder=URL"`
 
-	Exec string `cli:"short=x,help=execute a command to handle streams"`
-	Tee  bool   `cli:"short=t,help=also write command input to stdout"`
-
-	FixedInput *string `cli:"short=F"`
-
 	Options []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
+
+	Exec       string  `cli:"short=x,help=execute a command to handle streams"`
+	Tee        bool    `cli:"short=t,help=also write command input to stdout"`
+	FixedInput *string `cli:"short=F"`
 
 	ListSchemes bool `cli:"help=list available schemes"`
 }

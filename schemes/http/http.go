@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -24,7 +25,7 @@ var HTTPSScheme = &ndog.Scheme{
 	Connect: Connect,
 }
 
-type Options struct {
+type ListenOptions struct {
 	StatusCode       int
 	Headers          map[string]string
 	ServeFile        string
@@ -33,8 +34,8 @@ type Options struct {
 	JSON             bool
 }
 
-func extractOptions(opts ndog.Options) (Options, error) {
-	o := Options{
+func extractListenOptions(opts ndog.Options) (ListenOptions, error) {
+	o := ListenOptions{
 		StatusCode: 200,
 		Headers:    map[string]string{},
 	}
@@ -43,6 +44,9 @@ func extractOptions(opts ndog.Options) (Options, error) {
 	}
 	if _, ok := opts.Pop("msgpack_to_json"); ok {
 		o.MsgpackToJSON = true
+	}
+	if _, ok := opts.Pop("json"); ok {
+		o.JSON = true
 	}
 
 	if val, ok := opts.Pop("status_code"); ok {
@@ -59,10 +63,6 @@ func extractOptions(opts ndog.Options) (Options, error) {
 		o.ServeFile = serveFileAbsPath
 	}
 
-	if _, ok := opts.Pop("json"); ok {
-		o.JSON = true
-	}
-
 	headerKeyPrefix := "header."
 	for key, val := range opts {
 		if !strings.HasPrefix(key, headerKeyPrefix) {
@@ -77,7 +77,7 @@ func extractOptions(opts ndog.Options) (Options, error) {
 }
 
 func Listen(cfg ndog.ListenConfig) error {
-	opts, err := extractOptions(cfg.Options)
+	opts, err := extractListenOptions(cfg.Options)
 	if err != nil {
 		return err
 	}
@@ -192,25 +192,134 @@ func jsonHandler(stream ndog.Stream, w http.ResponseWriter, r *http.Request) {
 	ndog.Logf(10, "handler closed")
 }
 
+type ConnectOptions struct {
+	Method  string
+	Headers map[string]string
+	JSON    bool
+}
+
+func extractConnectOptions(opts ndog.Options) (ConnectOptions, error) {
+	o := ConnectOptions{
+		Method:  "GET",
+		Headers: map[string]string{},
+	}
+	if _, ok := opts.Pop("json"); ok {
+		o.JSON = true
+	}
+	if val, ok := opts.Pop("method"); ok {
+		o.Method = val
+	}
+
+	headerKeyPrefix := "header."
+	for key, val := range opts {
+		if !strings.HasPrefix(key, headerKeyPrefix) {
+			continue
+		}
+		headerKey := strings.TrimPrefix(key, headerKeyPrefix)
+		o.Headers[headerKey] = val
+		delete(opts, key)
+	}
+
+	return o, opts.Done()
+}
+
 func Connect(cfg ndog.ConnectConfig) error {
-	ndog.Logf(0, "request: GET %s", cfg.URL.RequestURI())
-
-	stream := cfg.Stream
-	// body not supported yet, need option for non-GET methods
-	io.Copy(io.Discard, stream)
-
-	resp, err := http.Get(cfg.URL.String())
+	opts, err := extractConnectOptions(cfg.Options)
 	if err != nil {
 		return err
 	}
+	if opts.JSON {
+		return ConnectJSON(cfg)
+	}
+
+	// Convert to HTTP request
+	httpReq, err := http.NewRequest(opts.Method, cfg.URL.String(), cfg.Stream)
+	if err != nil {
+		return err
+	}
+	for key, val := range opts.Headers {
+		httpReq.Header.Add(key, val)
+	}
+
+	// Do request
+	ndog.Logf(0, "request: %s %s", opts.Method, cfg.URL.RequestURI())
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return err
+	}
+
 	ndog.Logf(0, "response: %s", resp.Status)
 	for key, values := range resp.Header {
 		ndog.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
 	}
-	io.Copy(stream, resp.Body)
+	if _, err := io.Copy(cfg.Stream, resp.Body); err != nil {
+		return err
+	}
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("got error response: %s", resp.Status)
 	}
+	return nil
+}
+
+func ConnectJSON(cfg ndog.ConnectConfig) error {
+	ndog.Logf(0, "request: GET %s", cfg.URL.RequestURI())
+
+	stream := cfg.Stream
+
+	// Read and decode request from stream
+	req, err := ndog.ReadJSON[Request](stream)
+	if err != nil {
+		return err
+	}
+
+	// Convert to HTTP request
+	method := req.Method
+	if method == "" {
+		method = "GET"
+	}
+	url := req.URL
+	if url == "" {
+		url = cfg.URL.String()
+	}
+	httpReq, err := http.NewRequest(method, url, bytes.NewBufferString(req.Body))
+	if err != nil {
+		return err
+	}
+	if req.Proto != "" {
+		httpReq.Proto = req.Proto
+	}
+	for key, vals := range req.Headers {
+		for _, val := range vals {
+			httpReq.Header.Add(key, val)
+		}
+	}
+
+	// Do request
+	httpResp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return err
+	}
+
+	ndog.Logf(0, "response: %s", httpResp.Status)
+
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return err
+	}
+	httpResp.Body.Close()
+
+	resp := Response{
+		StatusCode: httpResp.StatusCode,
+		Body:       string(body),
+		Headers:    map[string][]string{},
+	}
+	for key, values := range httpResp.Header {
+		resp.Headers[key] = values
+	}
+	if err := ndog.WriteJSON(stream, resp); err != nil {
+		return err
+	}
+
 	return nil
 }
