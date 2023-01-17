@@ -34,9 +34,9 @@ func main() {
 type Ndog struct {
 	Verbose  bool `cli:"short=v"`
 	Debug    bool
-	Quiet    bool `cli:"short=q"`
+	Quiet    bool `cli:"short=q,help=disable all logging"`
 	LogLevel int  `cli:"hidden"`
-	Log      bool
+	LogIO    bool `cli:"help=log all I/O"`
 
 	ListenURL  *url.URL `cli:"name=listen,short=l,placeholder=URL"`
 	ConnectURL *url.URL `cli:"name=connect,short=c,placeholder=URL"`
@@ -128,7 +128,7 @@ func (cmd Ndog) Run() error {
 	default:
 		streamFactory = ndog.NewStdIOStreamFactory(fixedInput)
 	}
-	if cmd.Log {
+	if cmd.LogIO {
 		streamFactory = ndog.NewLogStreamFactory(streamFactory)
 	}
 
@@ -142,7 +142,7 @@ func (cmd Ndog) Run() error {
 			StreamFactory: streamFactory,
 		})
 	case connectScheme != nil:
-		stream := streamFactory.NewStream("") // TODO name
+		stream := streamFactory.NewStream(cmd.ConnectURL.String())
 		return connectScheme.Connect(ndog.ConnectConfig{
 			Config: ndog.Config{
 				URL:     cmd.ConnectURL,

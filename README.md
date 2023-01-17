@@ -36,10 +36,10 @@ Ndog represents all schemes using _streams_, which are bidirectional (duplex)
 byte streams. Streams can be multiplexed together (e.g. when listening with no
 `--exec`), or handled individually (e.g. by an `--exec` subprocess).
 
-| Context | Read | Write |
-| --- | --- | --- |
-| Listen | Data from client (request) | Data to client (response) |
-| Connect | Data from server (response) | Data to server (request) |
+| Context | Read                        | Write                     |
+| ---     | ---                         | ---                       |
+| Listen  | Data from client (request)  | Data to client (response) |
+| Connect | Data from server (response) | Data to server (request)  |
 
 ## Schemes
 
