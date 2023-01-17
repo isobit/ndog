@@ -10,8 +10,8 @@ import (
 )
 
 type ExecStreamFactory struct {
-	Args           []string
-	TeeWriteCloser io.WriteCloser
+	Args      []string
+	TeeWriter io.Writer
 }
 
 func NewExecStreamFactory(args []string) *ExecStreamFactory {
@@ -54,8 +54,8 @@ func (f *ExecStreamFactory) NewStream(name string) Stream {
 	}()
 
 	var w io.WriteCloser = stdin
-	if f.TeeWriteCloser != nil {
-		w = MultiWriteCloser(w, f.TeeWriteCloser)
+	if f.TeeWriter != nil {
+		w = FuncWriteCloser(io.MultiWriter(w, f.TeeWriter), w.Close)
 	}
 
 	shutdownCh := make(chan bool)
@@ -93,6 +93,7 @@ func (f *ExecStreamFactory) NewStream(name string) Stream {
 	return Stream{
 		Reader: FuncReadCloser(stdout, func() error {
 			shutdownCh <- true
+			Logf(10, "exec: closing stdout: %d", cmd.Process.Pid)
 			return stdout.Close()
 		}),
 		Writer: FuncWriteCloser(w, func() error {

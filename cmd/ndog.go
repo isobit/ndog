@@ -124,7 +124,7 @@ func (cmd Ndog) Run() error {
 		}
 		execStreamFactory := ndog.NewExecStreamFactory(args)
 		if cmd.Tee {
-			execStreamFactory.TeeWriteCloser = os.Stdout
+			execStreamFactory.TeeWriter = os.Stdout
 		}
 		streamFactory = execStreamFactory
 	// case interactive:

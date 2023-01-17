@@ -46,10 +46,12 @@ func Listen(cfg ndog.ListenConfig) error {
 		for {
 			nr, err := conn.Read(buf)
 			if err != nil {
+				ndog.Logf(-1, "conn read error: %s", err)
 				return
 			}
 			_, err = stream.Writer.Write(buf[:nr])
 			if err != nil {
+				ndog.Logf(-1, "stream write error: %s", err)
 				return
 			}
 		}
