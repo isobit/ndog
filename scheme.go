@@ -6,33 +6,44 @@ import (
 	"strings"
 )
 
-type Config struct {
-	StreamFactory
-	Options map[string]string
-	URL     *url.URL
+type Scheme struct {
+	Names   []string
+	Listen  func(ListenConfig) error
+	Connect func(ConnectConfig) error
 }
 
-func (cfg *Config) PopOption(key string) (string, bool) {
-	v, ok := cfg.Options[key]
+type Config struct {
+	URL     *url.URL
+	Options Options
+}
+
+type ListenConfig struct {
+	Config
+	StreamFactory StreamFactory
+}
+
+type ConnectConfig struct {
+	Config
+	Stream Stream
+}
+
+type Options map[string]string
+
+func (opts Options) Pop(key string) (string, bool) {
+	v, ok := opts[key]
 	if ok {
-		delete(cfg.Options, key)
+		delete(opts, key)
 	}
 	return v, ok
 }
 
-func (cfg *Config) CheckRemainingOptions() error {
-	if len(cfg.Options) == 0 {
+func (opts Options) Done() error {
+	if len(opts) == 0 {
 		return nil
 	}
 	keys := []string{}
-	for k := range cfg.Options {
+	for k := range opts {
 		keys = append(keys, k)
 	}
 	return fmt.Errorf("unknown options: %s", strings.Join(keys, ", "))
-}
-
-type Scheme struct {
-	Names   []string
-	Listen  func(Config) error
-	Connect func(Config) error
 }

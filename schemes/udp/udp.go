@@ -14,7 +14,7 @@ var Scheme = &ndog.Scheme{
 	Listen:  Listen,
 }
 
-func Listen(cfg ndog.Config) error {
+func Listen(cfg ndog.ListenConfig) error {
 	addr, err := net.ResolveUDPAddr("udp", cfg.URL.Host)
 	if err != nil {
 		return fmt.Errorf("invalid address: %w", err)
@@ -46,13 +46,14 @@ func Listen(cfg ndog.Config) error {
 			stream = existingStream
 		} else {
 			ndog.Logf(10, "creating new stream: %s", remoteAddrStr)
-			stream = cfg.NewStream(remoteAddrStr)
-			// TODO close stream
+			stream = cfg.StreamFactory.NewStream(remoteAddrStr)
+			// TODO close stream reader on timeout
 			streams[remoteAddrStr] = stream
-			go io.Copy(newUDPWriter(conn, remoteAddr), stream)
+			go io.Copy(newUDPWriter(conn, remoteAddr), stream.Reader)
 		}
 
-		_, err = stream.Write(buf[:nr])
+		// TODO close stream writer on timeout
+		_, err = stream.Writer.Write(buf[:nr])
 		if err != nil {
 			return err
 		}
@@ -75,7 +76,7 @@ func (uw *udpWriter) Write(p []byte) (int, error) {
 	return uw.conn.WriteToUDP(p, uw.addr)
 }
 
-func Connect(cfg ndog.Config) error {
+func Connect(cfg ndog.ConnectConfig) error {
 	addr, err := net.ResolveUDPAddr("udp", cfg.URL.Host)
 	if err != nil {
 		return fmt.Errorf("invalid address: %w", err)
@@ -90,11 +91,10 @@ func Connect(cfg ndog.Config) error {
 	remoteAddr := conn.RemoteAddr()
 	ndog.Logf(0, "connected: %s", remoteAddr)
 
-	stream := cfg.NewStream(remoteAddr.String())
-	defer stream.Close()
+	stream := cfg.Stream
 
-	go io.Copy(conn, stream)
-	_, err = io.Copy(stream, conn)
+	go io.Copy(conn, stream.Reader)
+	_, err = io.Copy(stream.Writer, conn)
 
 	ndog.Logf(0, "closed: %s", remoteAddr)
 	return err

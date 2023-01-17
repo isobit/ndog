@@ -14,7 +14,7 @@ var Scheme = &ndog.Scheme{
 	Listen:  Listen,
 }
 
-func Listen(cfg ndog.Config) error {
+func Listen(cfg ndog.ListenConfig) error {
 	addr, err := net.ResolveTCPAddr("tcp", cfg.URL.Host)
 	if err != nil {
 		return fmt.Errorf("invalid address: %w", err)
@@ -32,18 +32,26 @@ func Listen(cfg ndog.Config) error {
 
 		remoteAddr := conn.RemoteAddr()
 
-		stream := cfg.NewStream(remoteAddr.String())
-		defer stream.Close()
-		go io.Copy(conn, stream)
+		stream := cfg.StreamFactory.NewStream(remoteAddr.String())
 
+		// Handle conn <- stream
+		go func() {
+			defer stream.Reader.Close()
+			io.Copy(conn, stream.Reader)
+		}()
+
+		// Handle conn -> stream
+		defer stream.Writer.Close()
 		buf := make([]byte, 1024)
 		for {
 			nr, err := conn.Read(buf)
 			if err != nil {
+				ndog.Logf(-1, "conn read error: %s", err)
 				return
 			}
-			_, err = stream.Write(buf[:nr])
+			_, err = stream.Writer.Write(buf[:nr])
 			if err != nil {
+				ndog.Logf(-1, "stream write error: %s", err)
 				return
 			}
 		}
@@ -67,7 +75,7 @@ func Listen(cfg ndog.Config) error {
 	}
 }
 
-func Connect(cfg ndog.Config) error {
+func Connect(cfg ndog.ConnectConfig) error {
 	addr, err := net.ResolveTCPAddr("tcp", cfg.URL.Host)
 	if err != nil {
 		return fmt.Errorf("invalid address: %w", err)
@@ -82,12 +90,25 @@ func Connect(cfg ndog.Config) error {
 	remoteAddr := conn.RemoteAddr()
 	ndog.Logf(0, "connected: %s", remoteAddr)
 
-	stream := cfg.NewStream(remoteAddr.String())
-	defer stream.Close()
+	stream := cfg.Stream
 
-	go io.Copy(conn, stream)
-	_, err = io.Copy(stream, conn)
+	go func() {
+		defer stream.Reader.Close()
+		io.Copy(conn, stream.Reader)
+	}()
+
+	defer stream.Writer.Close()
+	_, err = io.Copy(stream.Writer, conn)
 
 	ndog.Logf(0, "closed: %s", remoteAddr)
 	return err
+}
+
+type Request struct {
+	RemoteAddr string
+	Data       []byte
+}
+
+type Response struct {
+	Data []byte
 }

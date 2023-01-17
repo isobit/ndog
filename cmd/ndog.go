@@ -41,12 +41,11 @@ type Ndog struct {
 	ListenURL  *url.URL `cli:"name=listen,short=l,placeholder=URL"`
 	ConnectURL *url.URL `cli:"name=connect,short=c,placeholder=URL"`
 
-	Exec string `cli:"short=x,help=execute a command to handle streams"`
-	Tee  bool   `cli:"short=t"`
-
-	FixedInput string `cli:"short=F"`
-
 	Options []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
+
+	Exec       string  `cli:"short=x,help=execute a command to handle streams"`
+	Tee        bool    `cli:"short=t,help=also write command input to stdout"`
+	FixedInput *string `cli:"short=F"`
 
 	ListSchemes bool `cli:"help=list available schemes"`
 }
@@ -69,8 +68,52 @@ func (cmd Ndog) Run() error {
 		ndog.LogLevel = 10
 	}
 
+	// Parse options.
+	opts := map[string]string{}
+	for _, s := range cmd.Options {
+		key, value, _ := strings.Cut(s, "=")
+		opts[key] = value
+	}
+
+	var listenScheme *ndog.Scheme
+	if cmd.ListenURL != nil {
+		scheme, ok := schemes.Registry[cmd.ListenURL.Scheme]
+		if !ok || scheme.Listen == nil {
+			return fmt.Errorf("unknown listen scheme: %s", cmd.ListenURL.Scheme)
+		}
+		listenScheme = scheme
+	}
+
+	var connectScheme *ndog.Scheme
+	if cmd.ConnectURL != nil {
+		scheme, ok := schemes.Registry[cmd.ConnectURL.Scheme]
+		if !ok || scheme.Connect == nil {
+			return fmt.Errorf("unknown connect scheme: %s", cmd.ConnectURL.Scheme)
+		}
+		connectScheme = scheme
+	}
+
+	// var interactive bool
+	var fixedInput []byte
+	if cmd.FixedInput != nil {
+		fixedInput = []byte(*cmd.FixedInput)
+	}
+	// else {
+	// 	stdinStat, _ := os.Stdin.Stat()
+	// 	interactive = stdinStat.Mode()&os.ModeCharDevice != 0
+	// }
+
 	var streamFactory ndog.StreamFactory
-	if cmd.Exec != "" {
+	switch {
+	case listenScheme != nil && connectScheme != nil:
+		streamFactory = ndog.ProxyStreamFactory{
+			ConnectConfig: ndog.Config{
+				Options: opts,
+				URL:     cmd.ConnectURL,
+			},
+			Connect: connectScheme.Connect,
+		}
+	case cmd.Exec != "":
 		args, err := shlex.Split(cmd.Exec)
 		if err != nil {
 			return cli.UsageErrorf("failed to split exec args: %s", err)
@@ -80,43 +123,33 @@ func (cmd Ndog) Run() error {
 			execStreamFactory.TeeWriter = os.Stdout
 		}
 		streamFactory = execStreamFactory
-	} else {
-		streamFactory = ndog.NewStdIOStreamFactory([]byte(cmd.FixedInput))
+	// case interactive:
+	// TODO
+	default:
+		streamFactory = ndog.NewStdIOStreamFactory(fixedInput)
 	}
 	if cmd.Log {
 		streamFactory = ndog.NewLogStreamFactory(streamFactory)
 	}
 
-	// Parse options.
-	opts := map[string]string{}
-	for _, s := range cmd.Options {
-		key, value, _ := strings.Cut(s, "=")
-		opts[key] = value
-	}
-
-	cfg := ndog.Config{
-		StreamFactory: streamFactory,
-		Options:       opts,
-	}
-
 	switch {
-	case cmd.ListenURL != nil && cmd.ConnectURL != nil:
-		return cli.UsageErrorf("proxy (passing --listen and --connect) is not supported yet")
-	case cmd.ListenURL != nil:
-		cfg.URL = cmd.ListenURL
-		if scheme, ok := schemes.Registry[cfg.URL.Scheme]; ok && scheme.Listen != nil {
-			return scheme.Listen(cfg)
-		} else {
-			return fmt.Errorf("unknown listen scheme: %s", cfg.URL.Scheme)
-		}
-
-	case cmd.ConnectURL != nil:
-		cfg.URL = cmd.ConnectURL
-		if scheme, ok := schemes.Registry[cfg.URL.Scheme]; ok && scheme.Connect != nil {
-			return scheme.Connect(cfg)
-		} else {
-			return fmt.Errorf("unknown connect scheme: %s", cfg.URL.Scheme)
-		}
+	case listenScheme != nil:
+		return listenScheme.Listen(ndog.ListenConfig{
+			Config: ndog.Config{
+				URL:     cmd.ListenURL,
+				Options: opts,
+			},
+			StreamFactory: streamFactory,
+		})
+	case connectScheme != nil:
+		stream := streamFactory.NewStream("") // TODO name
+		return connectScheme.Connect(ndog.ConnectConfig{
+			Config: ndog.Config{
+				URL:     cmd.ConnectURL,
+				Options: opts,
+			},
+			Stream: stream,
+		})
 	default:
 		return cli.UsageErrorf("at least one of --listen or --connect must be specified")
 	}

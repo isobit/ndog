@@ -16,7 +16,7 @@ var Scheme = &ndog.Scheme{
 	Listen:  Listen,
 }
 
-func Listen(cfg ndog.Config) error {
+func Listen(cfg ndog.ListenConfig) error {
 	s := &http.Server{
 		Addr: cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -25,10 +25,10 @@ func Listen(cfg ndog.Config) error {
 				ndog.Logf(2, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
 			wsHandler := websocket.Handler(func(conn *websocket.Conn) {
-				stream := cfg.NewStream(r.RemoteAddr)
+				stream := cfg.StreamFactory.NewStream(r.RemoteAddr)
 				defer stream.Close()
 
-				go io.Copy(conn, stream)
+				go io.Copy(conn, stream.Reader)
 
 				buf := make([]byte, 1024)
 				for {
@@ -38,7 +38,7 @@ func Listen(cfg ndog.Config) error {
 					}
 					ndog.Logf(2, "read: %d bytes from %s", nr, r.RemoteAddr)
 
-					_, err = stream.Write(buf[:nr])
+					_, err = stream.Writer.Write(buf[:nr])
 					if err != nil {
 						return
 					}
@@ -52,7 +52,7 @@ func Listen(cfg ndog.Config) error {
 	return s.ListenAndServe()
 }
 
-func Connect(cfg ndog.Config) error {
+func Connect(cfg ndog.ConnectConfig) error {
 	conn, err := websocket.Dial(cfg.URL.String(), "", "http://localhost")
 	if err != nil {
 		return err
@@ -62,11 +62,10 @@ func Connect(cfg ndog.Config) error {
 	remoteAddr := conn.RemoteAddr()
 	ndog.Logf(0, "connected: %s", remoteAddr)
 
-	stream := cfg.NewStream(remoteAddr.String())
-	defer stream.Close()
+	stream := cfg.Stream
 
-	go io.Copy(conn, stream)
-	_, err = io.Copy(stream, conn)
+	go io.Copy(conn, stream.Reader)
+	_, err = io.Copy(stream.Writer, conn)
 
 	ndog.Logf(0, "closed: %s", remoteAddr)
 	return err
