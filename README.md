@@ -21,6 +21,7 @@ Features/goals (unchecked boxes have not been implemented yet):
 	- [x] HTTP
 	- [x] WebSockets
 	- [x] PostgreSQL
+	- [ ] SSH
 	- [ ] QUIC
 	- [ ] GraphQL
 	- More schemes TBD!
