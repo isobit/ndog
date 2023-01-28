@@ -77,8 +77,8 @@ func (cmd Ndog) Run() error {
 
 	var listenScheme *ndog.Scheme
 	if cmd.ListenURL != nil {
-		scheme, ok := schemes.Registry[cmd.ListenURL.Scheme]
-		if !ok || scheme.Listen == nil {
+		scheme := schemes.Lookup(cmd.ListenURL.Scheme)
+		if scheme == nil || scheme.Listen == nil {
 			return fmt.Errorf("unknown listen scheme: %s", cmd.ListenURL.Scheme)
 		}
 		listenScheme = scheme
@@ -86,8 +86,8 @@ func (cmd Ndog) Run() error {
 
 	var connectScheme *ndog.Scheme
 	if cmd.ConnectURL != nil {
-		scheme, ok := schemes.Registry[cmd.ConnectURL.Scheme]
-		if !ok || scheme.Connect == nil {
+		scheme := schemes.Lookup(cmd.ConnectURL.Scheme)
+		if scheme == nil || scheme.Connect == nil {
 			return fmt.Errorf("unknown connect scheme: %s", cmd.ConnectURL.Scheme)
 		}
 		connectScheme = scheme

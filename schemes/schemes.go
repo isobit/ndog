@@ -12,23 +12,31 @@ import (
 	"github.com/isobit/ndog/schemes/websocket"
 )
 
+func init() {
+	registerSchemes(
+		http.HTTPSScheme,
+		http.HTTPScheme,
+		postgresql.Scheme,
+		ssh.Scheme,
+		tcp.Scheme,
+		udp.Scheme,
+		websocket.Scheme,
+	)
+}
+
 var Registry = map[string]*ndog.Scheme{}
 
-func registerScheme(scheme *ndog.Scheme) {
-	for _, name := range scheme.Names {
-		if _, exists := Registry[name]; exists {
-			panic(fmt.Sprintf("conflicting scheme name: %s", name))
+func registerSchemes(schemes ...*ndog.Scheme) {
+	for _, scheme := range schemes {
+		for _, name := range scheme.Names {
+			if _, exists := Registry[name]; exists {
+				panic(fmt.Sprintf("conflicting scheme name: %s", name))
+			}
+			Registry[name] = scheme
 		}
-		Registry[name] = scheme
 	}
 }
 
-func init() {
-	registerScheme(http.HTTPSScheme)
-	registerScheme(http.HTTPScheme)
-	registerScheme(postgresql.Scheme)
-	registerScheme(ssh.Scheme)
-	registerScheme(tcp.Scheme)
-	registerScheme(udp.Scheme)
-	registerScheme(websocket.Scheme)
+func Lookup(urlScheme string) *ndog.Scheme {
+	return Registry[urlScheme]
 }
