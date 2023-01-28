@@ -52,7 +52,7 @@ func (f *StdIOStreamFactory) NewStream(name string) Stream {
 	rc := f.readCloserFunc()
 	return Stream{
 		Reader: rc,
-		Writer: os.Stdout,
+		Writer: NopWriteCloser(os.Stdout),
 	}
 }
 
@@ -229,4 +229,15 @@ func MultiWriteCloser(writerClosers ...io.WriteCloser) io.WriteCloser {
 		}
 		return nil
 	})
+}
+func NopWriteCloser(w io.Writer) io.WriteCloser {
+	return nopWriteCloser{Writer: w}
+}
+
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (nwc nopWriteCloser) Close() error {
+	return nil
 }
