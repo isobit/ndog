@@ -17,6 +17,8 @@ func init() {
 		http.HTTPSScheme,
 		http.HTTPScheme,
 		postgresql.Scheme,
+		postgresql.ListenScheme,
+		postgresql.NotifyScheme,
 		ssh.Scheme,
 		tcp.Scheme,
 		udp.Scheme,
