@@ -33,4 +33,4 @@ dist: $(DISTS)
 
 $(DISTS): _dist/ndog-%:
 	mkdir -p _dist
-	GOOS=$(word 1,$(subst -, ,$*)) GOARCH=$(word 2,$(subst -, ,$*)) go build -o $@ ./cmd/ndog.go
+	CGO_ENABLED=0 GOOS=$(word 1,$(subst -, ,$*)) GOARCH=$(word 2,$(subst -, ,$*)) go build -o $@ ./cmd/ndog.go
