@@ -52,8 +52,57 @@ func Listen(cfg ndog.ListenConfig) error {
 	return s.ListenAndServe()
 }
 
+type ConnectOptions struct {
+	Origin   string
+	Protocol string
+	Headers  map[string]string
+}
+
+func extractConnectOptions(opts ndog.Options) (ConnectOptions, error) {
+	o := ConnectOptions{
+		Origin:  "http://localhost",
+		Headers: map[string]string{},
+	}
+
+	if val, ok := opts.Pop("origin"); ok {
+		o.Origin = val
+	}
+
+	if val, ok := opts.Pop("protocol"); ok {
+		o.Protocol = val
+	}
+
+	headerKeyPrefix := "header."
+	for key, val := range opts {
+		if !strings.HasPrefix(key, headerKeyPrefix) {
+			continue
+		}
+		headerKey := strings.TrimPrefix(key, headerKeyPrefix)
+		o.Headers[headerKey] = val
+		delete(opts, key)
+	}
+
+	return o, opts.Done()
+}
+
 func Connect(cfg ndog.ConnectConfig) error {
-	conn, err := websocket.Dial(cfg.URL.String(), "", "http://localhost")
+	opts, err := extractConnectOptions(cfg.Options)
+	if err != nil {
+		return err
+	}
+
+	wsCfg, err := websocket.NewConfig(cfg.URL.String(), opts.Origin)
+	if err != nil {
+		return err
+	}
+	if opts.Protocol != "" {
+		wsCfg.Protocol = []string{opts.Protocol}
+	}
+	for key, val := range opts.Headers {
+		wsCfg.Header.Add(key, val)
+	}
+
+	conn, err := websocket.DialConfig(wsCfg)
 	if err != nil {
 		return err
 	}
