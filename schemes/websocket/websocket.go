@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -11,12 +12,15 @@ import (
 )
 
 var Scheme = &ndog.Scheme{
-	Names:   []string{"ws"},
-	Connect: Connect,
+	Names:   []string{"ws", "wss"},
 	Listen:  Listen,
+	Connect: Connect,
 }
 
 func Listen(cfg ndog.ListenConfig) error {
+	if cfg.URL.Scheme != "ws" {
+		return fmt.Errorf("listen does not support secure websockets yet")
+	}
 	s := &http.Server{
 		Addr: cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
