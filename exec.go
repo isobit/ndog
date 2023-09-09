@@ -58,11 +58,14 @@ func (f *ExecStreamManager) NewStream(name string) Stream {
 		w = FuncWriteCloser(io.MultiWriter(w, f.TeeWriter), w.Close)
 	}
 
-	shutdownCh := make(chan bool)
+	stdinClosed := make(chan bool)
+	stdoutClosed := make(chan bool)
 	go func() {
 		// Wait for reader and writer to be closed.
-		<-shutdownCh
-		<-shutdownCh
+		// Must wait for reader/stdin to be closed first or else we'll
+		// deadlock.
+		<-stdinClosed
+		<-stdoutClosed
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -92,12 +95,13 @@ func (f *ExecStreamManager) NewStream(name string) Stream {
 
 	return Stream{
 		Reader: FuncReadCloser(stdout, func() error {
-			shutdownCh <- true
+			close(stdoutClosed)
 			Logf(10, "exec: closing stdout: %d", cmd.Process.Pid)
-			return stdout.Close()
+			err := stdout.Close()
+			return err
 		}),
 		Writer: FuncWriteCloser(w, func() error {
-			shutdownCh <- true
+			close(stdinClosed)
 			Logf(10, "exec: closing stdin: %d", cmd.Process.Pid)
 			return w.Close()
 		}),
