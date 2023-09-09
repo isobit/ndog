@@ -7,9 +7,20 @@ import (
 )
 
 type Scheme struct {
-	Names   []string
+	Names []string
+
 	Listen  func(ListenConfig) error
 	Connect func(ConnectConfig) error
+
+	Description       string
+	ListenOptionHelp  []OptionHelp
+	ConnectOptionHelp []OptionHelp
+}
+
+type OptionHelp struct {
+	Name        string
+	Value       string
+	Description string
 }
 
 type Config struct {

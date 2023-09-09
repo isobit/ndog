@@ -47,12 +47,16 @@ type Ndog struct {
 	Tee        bool    `cli:"short=t,help=also write command input to stdout"`
 	FixedInput *string `cli:"short=F"`
 
-	ListSchemes bool `cli:"help=list available schemes"`
+	ListSchemes bool   `cli:"short=L,help=list available schemes"`
+	SchemeHelp  string `cli:"short=H,help=show help for scheme"`
 }
 
 func (cmd Ndog) Run() error {
 	if cmd.ListSchemes {
 		return listSchemes()
+	}
+	if cmd.SchemeHelp != "" {
+		return schemeHelp(cmd.SchemeHelp)
 	}
 
 	switch {
@@ -164,7 +168,7 @@ func listSchemes() error {
 	}
 	sort.Strings(list)
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	w := tabwriter.NewWriter(os.Stderr, 0, 0, 1, ' ', 0)
 	for _, name := range list {
 		scheme := schemes.Registry[name]
 		supports := []string{}
@@ -181,5 +185,41 @@ func listSchemes() error {
 		}
 		fmt.Fprintln(w)
 	}
+	return w.Flush()
+}
+
+func schemeHelp(name string) error {
+	scheme, ok := schemes.Registry[name]
+	if !ok {
+		return fmt.Errorf("unknown scheme: %s; use --list-schemes to show valid schemes", name)
+	}
+
+	w := tabwriter.NewWriter(os.Stderr, 0, 0, 1, ' ', 0)
+
+	fmt.Fprintf(w, "SCHEME: %s\n", name)
+	fmt.Fprintln(w)
+
+	if scheme.Description != "" {
+		fmt.Fprintf(w, "DESCRIPTION:\n")
+		fmt.Fprintf(w, "    %s\n", strings.ReplaceAll(strings.TrimSpace(scheme.Description), "\n", "\n    "))
+		fmt.Fprintln(w)
+	}
+
+	if scheme.ListenOptionHelp != nil {
+		fmt.Fprintf(w, "LISTEN OPTIONS:\n")
+		for _, h := range scheme.ListenOptionHelp {
+			fmt.Fprintf(w, "    %s\t%s\t%s\t\n", h.Name, h.Value, h.Description)
+		}
+		fmt.Fprintln(w)
+	}
+
+	if scheme.ConnectOptionHelp != nil {
+		fmt.Fprintf(w, "CONNECT OPTIONS:\n")
+		for _, h := range scheme.ConnectOptionHelp {
+			fmt.Fprintf(w, "    %s\t%s\t%s\t\n", h.Name, h.Value, h.Description)
+		}
+		fmt.Fprintln(w)
+	}
+
 	return w.Flush()
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -15,6 +16,16 @@ import (
 var ListenScheme = &ndog.Scheme{
 	Names:   []string{"postgresql+listen", "postgres+listen", "pg+listen"},
 	Connect: listenConnect,
+
+	Description: `
+Connect runs LISTEN on each channel(s) in the URL fragment (comma-separated) on
+the specified PostgreSQL server and outputs any received notifications.
+
+Example: ndog -c 'postgres+listen://localhost#foo,bar'
+	`,
+	ConnectOptionHelp: []ndog.OptionHelp{
+		{"json", "", "use JSON representation for returned rows"},
+	},
 }
 
 func listenConnect(cfg ndog.ConnectConfig) error {
@@ -23,10 +34,10 @@ func listenConnect(cfg ndog.ConnectConfig) error {
 		return err
 	}
 
-	channelName := cfg.URL.Fragment
-	if channelName == "" {
-		return fmt.Errorf("URL must include the channel name as a fragment")
+	if cfg.URL.Fragment == "" {
+		return fmt.Errorf("URL must include one or more comma-separated channel names as a fragment")
 	}
+	channelNames := strings.Split(cfg.URL.Fragment, ",")
 
 	connUrl := *cfg.URL
 	connUrl.Scheme = "postgresql"
@@ -45,8 +56,11 @@ func listenConnect(cfg ndog.ConnectConfig) error {
 
 	stream := cfg.Stream
 
-	if _, err := conn.Exec(ctx, fmt.Sprintf("LISTEN %s", channelName)); err != nil {
-		return err
+	for _, channelName := range channelNames {
+		ndog.Logf(1, "exec: LISTEN %s", channelName)
+		if _, err := conn.Exec(ctx, fmt.Sprintf("LISTEN %s", channelName)); err != nil {
+			return err
+		}
 	}
 
 	for {
@@ -54,7 +68,7 @@ func listenConnect(cfg ndog.ConnectConfig) error {
 		if err != nil {
 			return err
 		}
-		ndog.Logf(1, "notification: %s", notification.Payload)
+		ndog.Logf(1, "notification: %s", notification.Channel)
 		if opts.JSON {
 			data, err := json.Marshal(notification)
 			if err != nil {
@@ -72,6 +86,16 @@ func listenConnect(cfg ndog.ConnectConfig) error {
 var NotifyScheme = &ndog.Scheme{
 	Names:   []string{"postgresql+notify", "postgres+notify", "pg+notify"},
 	Connect: notifyConnect,
+
+	Description: `
+Connect runs NOTIFY on the channel in the URL fragment for each input line,
+using the input as the payload.
+
+Example: ndog -c 'postgres+notify://localhost#foo' -F hello
+	`,
+	ConnectOptionHelp: []ndog.OptionHelp{
+		{"json", "", "use JSON representation for returned rows"},
+	},
 }
 
 func notifyConnect(cfg ndog.ConnectConfig) error {
@@ -103,7 +127,7 @@ func notifyConnect(cfg ndog.ConnectConfig) error {
 	scanner := bufio.NewScanner(cfg.Stream.Reader)
 	for scanner.Scan() {
 		payload := scanner.Text()
-		ndog.Logf(1, "notify: %s", payload)
+		ndog.Logf(1, "notify: %s", channelName)
 		if _, err := conn.Exec(ctx, "SELECT pg_notify($1, $2)", channelName, payload); err != nil {
 			return err
 		}
