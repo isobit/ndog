@@ -88,9 +88,12 @@ func Listen(cfg ndog.ListenConfig) error {
 	s := &http.Server{
 		Addr: cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ndog.Logf(1, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
+			ndog.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
+			if r.Host != cfg.URL.Host {
+				ndog.Logf(1, "request header: Host: %s", r.Host)
+			}
 			for key, values := range r.Header {
-				ndog.Logf(2, "request header: %s: %s", key, strings.Join(values, ", "))
+				ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
 			if opts.ServeFile != "" {
 				http.ServeFile(w, r, filepath.Join(opts.ServeFile, r.URL.Path))
@@ -238,11 +241,18 @@ func Connect(cfg ndog.ConnectConfig) error {
 		return err
 	}
 	for key, val := range opts.Headers {
+		if strings.EqualFold(key, "host") {
+			ndog.Logf(2, "setting host: %s", val)
+			httpReq.Host = val
+		}
 		httpReq.Header.Add(key, val)
 	}
 
 	// Do request
 	ndog.Logf(0, "request: %s %s", opts.Method, cfg.URL.RequestURI())
+	for key, values := range httpReq.Header {
+		ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
+	}
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return err
@@ -257,7 +267,7 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("got error response: %s", resp.Status)
+		return fmt.Errorf(resp.Status)
 	}
 	return nil
 }

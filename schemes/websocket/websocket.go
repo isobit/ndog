@@ -24,9 +24,12 @@ func Listen(cfg ndog.ListenConfig) error {
 	s := &http.Server{
 		Addr: cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ndog.Logf(1, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
+			ndog.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
+			if r.Host != cfg.URL.Host {
+				ndog.Logf(1, "request header: Host: %s", r.Host)
+			}
 			for key, values := range r.Header {
-				ndog.Logf(2, "request header: %s: %s", key, strings.Join(values, ", "))
+				ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
 			wsHandler := websocket.Handler(func(conn *websocket.Conn) {
 				stream := cfg.StreamManager.NewStream(r.RemoteAddr)
