@@ -126,7 +126,10 @@ func Listen(cfg ndog.ListenConfig) error {
 				}
 				io.WriteString(stream.Writer, "\n")
 			} else {
-				io.Copy(stream.Writer, r.Body)
+				if _, err := io.Copy(stream.Writer, r.Body); err != nil {
+					ndog.Logf(-1, "error reading request body: %s", err)
+					return
+				}
 			}
 			stream.Writer.Close()
 
@@ -134,8 +137,12 @@ func Listen(cfg ndog.ListenConfig) error {
 			for key, val := range opts.Headers {
 				w.Header().Add(key, val)
 			}
+			ndog.Logf(10, "writing status code %d", opts.StatusCode)
 			w.WriteHeader(opts.StatusCode)
-			io.Copy(w, stream.Reader)
+			if _, err := io.Copy(w, stream.Reader); err != nil {
+				ndog.Logf(-1, "error writing response body: %s", err)
+				return
+			}
 			ndog.Logf(10, "handler closed")
 		}),
 	}
