@@ -32,27 +32,31 @@ func main() {
 }
 
 type Ndog struct {
-	Verbose  bool `cli:"short=v"`
-	Debug    bool
-	Quiet    bool `cli:"short=q,help=disable all logging"`
-	LogLevel int  `cli:"hidden"`
-	LogIO    bool `cli:"help=log all I/O"`
-
 	ListenURL  *url.URL `cli:"name=listen,short=l,placeholder=URL"`
 	ConnectURL *url.URL `cli:"name=connect,short=c,placeholder=URL"`
 
 	Options []string `cli:"short=o,name=option,append,placeholder=KEY=VAL,nodefault,help=scheme options; may be passed multiple times"`
 
-	Exec       string  `cli:"short=x,help=execute a command to handle streams"`
-	Tee        bool    `cli:"short=t,help=also write command input to stdout"`
-	FixedInput *string `cli:"short=F"`
+	Data *string `cli:"short=d,help=use specified data instead of reading from STDIN"`
+	Exec string  `cli:"short=x,help=execute a command to handle streams"`
+	Tee  bool    `cli:"short=t,help=also write command input to stdout"`
 
-	ListSchemes bool `cli:"help=list available schemes"`
+	ListSchemes bool   `cli:"short=L,help=list available schemes"`
+	SchemeHelp  string `cli:"short=H,help=show help for scheme"`
+
+	Verbose  bool `cli:"short=v,help=more verbose logging"`
+	Quiet    bool `cli:"short=q,help=disable all logging"`
+	Debug    bool `cli:"help=maximum logging"`
+	LogLevel int  `cli:"hidden"`
+	LogIO    bool `cli:"help=log all I/O"`
 }
 
 func (cmd Ndog) Run() error {
 	if cmd.ListSchemes {
 		return listSchemes()
+	}
+	if cmd.SchemeHelp != "" {
+		return schemeHelp(cmd.SchemeHelp)
 	}
 
 	switch {
@@ -94,9 +98,9 @@ func (cmd Ndog) Run() error {
 	}
 
 	// var interactive bool
-	var fixedInput []byte
-	if cmd.FixedInput != nil {
-		fixedInput = []byte(*cmd.FixedInput)
+	var fixedData []byte
+	if cmd.Data != nil {
+		fixedData = []byte(*cmd.Data)
 	}
 	// else {
 	// 	stdinStat, _ := os.Stdin.Stat()
@@ -126,7 +130,7 @@ func (cmd Ndog) Run() error {
 	// case interactive:
 	// TODO
 	default:
-		streamManager = ndog.NewStdIOStreamManager(fixedInput)
+		streamManager = ndog.NewStdIOStreamManager(fixedData)
 	}
 	if cmd.LogIO {
 		streamManager = ndog.NewLogStreamManager(streamManager)
@@ -164,7 +168,7 @@ func listSchemes() error {
 	}
 	sort.Strings(list)
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	w := tabwriter.NewWriter(os.Stderr, 0, 0, 1, ' ', 0)
 	for _, name := range list {
 		scheme := schemes.Registry[name]
 		supports := []string{}
@@ -181,5 +185,41 @@ func listSchemes() error {
 		}
 		fmt.Fprintln(w)
 	}
+	return w.Flush()
+}
+
+func schemeHelp(name string) error {
+	scheme, ok := schemes.Registry[name]
+	if !ok {
+		return fmt.Errorf("unknown scheme: %s; use --list-schemes to show valid schemes", name)
+	}
+
+	w := tabwriter.NewWriter(os.Stderr, 0, 0, 1, ' ', 0)
+
+	fmt.Fprintf(w, "SCHEME: %s\n", strings.Join(scheme.Names, " "))
+	fmt.Fprintln(w)
+
+	if scheme.Description != "" {
+		fmt.Fprintf(w, "DESCRIPTION:\n")
+		fmt.Fprintf(w, "    %s\n", strings.ReplaceAll(strings.TrimSpace(scheme.Description), "\n", "\n    "))
+		fmt.Fprintln(w)
+	}
+
+	if scheme.ListenOptionHelp != nil {
+		fmt.Fprintf(w, "LISTEN OPTIONS:\n")
+		for _, h := range scheme.ListenOptionHelp {
+			fmt.Fprintf(w, "    %s\t%s\t%s\t\n", h.Name, h.Value, h.Description)
+		}
+		fmt.Fprintln(w)
+	}
+
+	if scheme.ConnectOptionHelp != nil {
+		fmt.Fprintf(w, "CONNECT OPTIONS:\n")
+		for _, h := range scheme.ConnectOptionHelp {
+			fmt.Fprintf(w, "    %s\t%s\t%s\t\n", h.Name, h.Value, h.Description)
+		}
+		fmt.Fprintln(w)
+	}
+
 	return w.Flush()
 }

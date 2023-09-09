@@ -12,6 +12,15 @@ var Scheme = &ndog.Scheme{
 	Names:   []string{"udp"},
 	Connect: Connect,
 	Listen:  Listen,
+
+	Description: `
+Connect opens a UDP connection to the server host and port specified in the URL.
+
+Listen starts a UDP server on the host and port specified in the URL.
+
+Examples:
+	Echo server: ndog -l 'udp://localhost:8080' -x 'cat'
+	`,
 }
 
 func Listen(cfg ndog.ListenConfig) error {

@@ -22,7 +22,8 @@ func init() {
 		ssh.Scheme,
 		tcp.Scheme,
 		udp.Scheme,
-		websocket.Scheme,
+		websocket.WSScheme,
+		websocket.WSSScheme,
 	)
 }
 

@@ -18,14 +18,35 @@ var HTTPScheme = &ndog.Scheme{
 	Names:   []string{"http"},
 	Connect: Connect,
 	Listen:  Listen,
+
+	Description: `
+Connect sends input as an HTTP request body to the specified URL.
+
+Listen sends input as an HTTP request body to the specified URL.
+
+Examples:
+	GET request: ndog -c 'http://example.net/' -d ''
+	Echo server: ndog -l 'http://localhost:8080' -x 'cat'
+	File server: ndog -l 'http://localhost:8080' -o 'serve_file=.'
+	`,
+	ConnectOptionHelp: connectOptionHelp,
+	ListenOptionHelp:  listenOptionHelp,
 }
 
 var HTTPSScheme = &ndog.Scheme{
 	Names:   []string{"https"},
 	Connect: Connect,
+
+	Description: `
+Connect sends input as an HTTPS request body to the specified URL.
+
+Examples:
+	GET request: ndog -c 'https://example.net/' -d ''
+	`,
+	ConnectOptionHelp: connectOptionHelp,
 }
 
-type ListenOptions struct {
+type listenOptions struct {
 	StatusCode       int
 	Headers          map[string]string
 	ServeFile        string
@@ -34,8 +55,16 @@ type ListenOptions struct {
 	JSON             bool
 }
 
-func extractListenOptions(opts ndog.Options) (ListenOptions, error) {
-	o := ListenOptions{
+var listenOptionHelp = ndog.OptionsHelp{}.
+	Add("header.<NAME>", "<VALUE>", "extra response headers to send").
+	Add("json", "", "use JSON representation for requests and responses").
+	Add("msgpack_to_json", "", "attempt to convert msgpack-encoded requests to JSON").
+	Add("serve_file", "<PATH>", "use Go's ServeFile to serve files relative to this directory").
+	Add("status_code", "<CODE>", "status code to send in response (default: 200)")
+	// {"request_line", "", ""}, // kinda weird, maybe should just drop this
+
+func extractListenOptions(opts ndog.Options) (listenOptions, error) {
+	o := listenOptions{
 		StatusCode: 200,
 		Headers:    map[string]string{},
 	}
@@ -150,66 +179,19 @@ func Listen(cfg ndog.ListenConfig) error {
 	return s.ListenAndServe()
 }
 
-type Request struct {
-	Proto   string
-	Method  string
-	URL     string
-	Headers map[string][]string
-	Body    string
-}
-
-type Response struct {
-	StatusCode int
-	Headers    map[string][]string
-	Body       string
-}
-
-func jsonHandler(stream ndog.Stream, w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		ndog.Logf(-1, "error reading request body: %s", err)
-		w.WriteHeader(500)
-		return
-	}
-
-	if err := ndog.WriteJSON(stream, Request{
-		Proto:   r.Proto,
-		Method:  r.Method,
-		URL:     r.URL.String(),
-		Headers: r.Header,
-		Body:    string(body),
-	}); err != nil {
-		ndog.Logf(-1, "error writing request JSON: %s", err)
-		w.WriteHeader(500)
-		return
-	}
-
-	resp, err := ndog.ReadJSON[Response](stream)
-	if err != nil {
-		ndog.Logf(-1, "error reading response JSON: %s", err)
-		w.WriteHeader(500)
-		return
-	}
-
-	header := w.Header()
-	for key, vals := range resp.Headers {
-		for _, val := range vals {
-			header.Add(key, val)
-		}
-	}
-	w.WriteHeader(resp.StatusCode)
-	io.WriteString(w, resp.Body)
-	ndog.Logf(10, "handler closed")
-}
-
-type ConnectOptions struct {
+type connectOptions struct {
 	Method  string
 	Headers map[string]string
 	JSON    bool
 }
 
-func extractConnectOptions(opts ndog.Options) (ConnectOptions, error) {
-	o := ConnectOptions{
+var connectOptionHelp = ndog.OptionsHelp{}.
+	Add("header.<NAME>", "<VALUE>", "extra request headers to send").
+	Add("json", "", "use JSON representation for requests and responses").
+	Add("method", "<METHOD>", "HTTP method to use (default: GET)")
+
+func extractConnectOptions(opts ndog.Options) (connectOptions, error) {
+	o := connectOptions{
 		Method:  "GET",
 		Headers: map[string]string{},
 	}
@@ -285,7 +267,7 @@ func ConnectJSON(cfg ndog.ConnectConfig) error {
 	stream := cfg.Stream
 
 	// Read and decode request from stream
-	req, err := ndog.ReadJSON[Request](stream)
+	req, err := ndog.ReadJSON[requestData](stream)
 	if err != nil {
 		return err
 	}
@@ -326,7 +308,7 @@ func ConnectJSON(cfg ndog.ConnectConfig) error {
 	}
 	httpResp.Body.Close()
 
-	resp := Response{
+	resp := responseData{
 		StatusCode: httpResp.StatusCode,
 		Body:       string(body),
 		Headers:    map[string][]string{},
@@ -339,4 +321,56 @@ func ConnectJSON(cfg ndog.ConnectConfig) error {
 	}
 
 	return nil
+}
+
+type requestData struct {
+	Proto   string
+	Method  string
+	URL     string
+	Headers map[string][]string
+	Body    string
+}
+
+type responseData struct {
+	StatusCode int
+	Headers    map[string][]string
+	Body       string
+}
+
+func jsonHandler(stream ndog.Stream, w http.ResponseWriter, r *http.Request) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		ndog.Logf(-1, "error reading request body: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	if err := ndog.WriteJSON(stream, requestData{
+		Proto:   r.Proto,
+		Method:  r.Method,
+		URL:     r.URL.String(),
+		Headers: r.Header,
+		Body:    string(body),
+	}); err != nil {
+		ndog.Logf(-1, "error writing request JSON: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	resp, err := ndog.ReadJSON[responseData](stream)
+	if err != nil {
+		ndog.Logf(-1, "error reading response JSON: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	header := w.Header()
+	for key, vals := range resp.Headers {
+		for _, val := range vals {
+			header.Add(key, val)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	io.WriteString(w, resp.Body)
+	ndog.Logf(10, "handler closed")
 }

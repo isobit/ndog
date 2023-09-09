@@ -16,6 +16,14 @@ import (
 var Scheme = &ndog.Scheme{
 	Names:   []string{"postgresql", "postgres", "pg"},
 	Connect: Connect,
+
+	Description: `
+Connect sends input to the specified PostgreSQL server and outputs the returned rows.
+
+Example: ndog -c 'postgres://localhost' -d 'select now();'
+	`,
+	ConnectOptionHelp: ndog.OptionsHelp{}.
+		Add("json", "", "use JSON representation for returned rows"),
 }
 
 type Options struct {

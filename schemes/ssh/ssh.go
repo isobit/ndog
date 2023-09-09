@@ -12,6 +12,10 @@ import (
 var Scheme = &ndog.Scheme{
 	Names:  []string{"ssh"},
 	Listen: Listen,
+
+	Description: `
+Listen starts an SSH server on the host and port specified in the URL.
+	`,
 }
 
 func Listen(cfg ndog.ListenConfig) error {

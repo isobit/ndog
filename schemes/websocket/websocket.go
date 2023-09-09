@@ -11,14 +11,34 @@ import (
 	"github.com/isobit/ndog"
 )
 
-var Scheme = &ndog.Scheme{
-	Names:   []string{"ws", "wss"},
+var WSScheme = &ndog.Scheme{
+	Names:   []string{"ws"},
 	Listen:  Listen,
 	Connect: Connect,
+
+	Description: `
+Connect opens a WebSocket connection to the specified URL.
+
+Listen starts a WebSocket server on the host and port specified in the URL.
+
+Examples:
+	Echo server: ndog -l 'ws://localhost:8080' -x 'cat'
+	`,
+	ConnectOptionHelp: connectOptionHelp,
+}
+
+var WSSScheme = &ndog.Scheme{
+	Names:   []string{"wss"},
+	Connect: Connect,
+
+	Description: `
+Connect opens a WebSocket connection to the specified URL.
+	`,
+	ConnectOptionHelp: connectOptionHelp,
 }
 
 func Listen(cfg ndog.ListenConfig) error {
-	if cfg.URL.Scheme != "ws" {
+	if cfg.URL.Scheme == "wss" {
 		return fmt.Errorf("listen does not support secure websockets yet")
 	}
 	s := &http.Server{
@@ -64,6 +84,11 @@ type ConnectOptions struct {
 	Protocol string
 	Headers  map[string]string
 }
+
+var connectOptionHelp = ndog.OptionsHelp{}.
+	Add("header.<NAME>", "<VALUE>", "extra request headers to send").
+	Add("origin", "<ORIGIN>", "").
+	Add("protocol", "<PROTOCOL>", "")
 
 func extractConnectOptions(opts ndog.Options) (ConnectOptions, error) {
 	o := ConnectOptions{

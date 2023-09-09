@@ -7,9 +7,14 @@ import (
 )
 
 type Scheme struct {
-	Names   []string
+	Names []string
+
 	Listen  func(ListenConfig) error
 	Connect func(ConnectConfig) error
+
+	Description       string
+	ListenOptionHelp  OptionsHelp
+	ConnectOptionHelp OptionsHelp
 }
 
 type Config struct {
@@ -46,4 +51,21 @@ func (opts Options) Done() error {
 		keys = append(keys, k)
 	}
 	return fmt.Errorf("unknown options: %s", strings.Join(keys, ", "))
+}
+
+type OptionsHelp []OptionHelp
+
+func (oh OptionsHelp) Add(name string, value string, description string) OptionsHelp {
+	oh = append(oh, OptionHelp{
+		Name:        name,
+		Value:       value,
+		Description: description,
+	})
+	return oh
+}
+
+type OptionHelp struct {
+	Name        string
+	Value       string
+	Description string
 }
