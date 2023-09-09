@@ -32,7 +32,7 @@ func Listen(cfg ndog.ListenConfig) error {
 
 		remoteAddr := conn.RemoteAddr()
 
-		stream := cfg.StreamFactory.NewStream(remoteAddr.String())
+		stream := cfg.StreamManager.NewStream(remoteAddr.String())
 
 		// Handle conn <- stream
 		go func() {

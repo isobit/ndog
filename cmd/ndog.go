@@ -103,10 +103,10 @@ func (cmd Ndog) Run() error {
 	// 	interactive = stdinStat.Mode()&os.ModeCharDevice != 0
 	// }
 
-	var streamFactory ndog.StreamFactory
+	var streamManager ndog.StreamManager
 	switch {
 	case listenScheme != nil && connectScheme != nil:
-		streamFactory = ndog.ProxyStreamFactory{
+		streamManager = ndog.ProxyStreamManager{
 			ConnectConfig: ndog.Config{
 				Options: opts,
 				URL:     cmd.ConnectURL,
@@ -118,18 +118,18 @@ func (cmd Ndog) Run() error {
 		if err != nil {
 			return cli.UsageErrorf("failed to split exec args: %s", err)
 		}
-		execStreamFactory := ndog.NewExecStreamFactory(args)
+		execStreamManager := ndog.NewExecStreamManager(args)
 		if cmd.Tee {
-			execStreamFactory.TeeWriter = os.Stdout
+			execStreamManager.TeeWriter = os.Stdout
 		}
-		streamFactory = execStreamFactory
+		streamManager = execStreamManager
 	// case interactive:
 	// TODO
 	default:
-		streamFactory = ndog.NewStdIOStreamFactory(fixedInput)
+		streamManager = ndog.NewStdIOStreamManager(fixedInput)
 	}
 	if cmd.LogIO {
-		streamFactory = ndog.NewLogStreamFactory(streamFactory)
+		streamManager = ndog.NewLogStreamManager(streamManager)
 	}
 
 	switch {
@@ -139,10 +139,10 @@ func (cmd Ndog) Run() error {
 				URL:     cmd.ListenURL,
 				Options: opts,
 			},
-			StreamFactory: streamFactory,
+			StreamManager: streamManager,
 		})
 	case connectScheme != nil:
-		stream := streamFactory.NewStream(cmd.ConnectURL.String())
+		stream := streamManager.NewStream(cmd.ConnectURL.String())
 		return connectScheme.Connect(ndog.ConnectConfig{
 			Config: ndog.Config{
 				URL:     cmd.ConnectURL,

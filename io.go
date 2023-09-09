@@ -21,16 +21,16 @@ func (stream Stream) Close() error {
 	return nil
 }
 
-type StreamFactory interface {
+type StreamManager interface {
 	NewStream(name string) Stream
 }
 
-type StdIOStreamFactory struct {
+type StdIOStreamManager struct {
 	readCloserFunc func() io.ReadCloser
 }
 
-func NewStdIOStreamFactory(fixedData []byte) *StdIOStreamFactory {
-	f := &StdIOStreamFactory{}
+func NewStdIOStreamManager(fixedData []byte) *StdIOStreamManager {
+	f := &StdIOStreamManager{}
 
 	if fixedData == nil {
 		fanout := FanoutStdin()
@@ -48,7 +48,7 @@ func NewStdIOStreamFactory(fixedData []byte) *StdIOStreamFactory {
 	return f
 }
 
-func (f *StdIOStreamFactory) NewStream(name string) Stream {
+func (f *StdIOStreamManager) NewStream(name string) Stream {
 	rc := f.readCloserFunc()
 	return Stream{
 		Reader: rc,

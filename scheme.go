@@ -19,7 +19,7 @@ type Config struct {
 
 type ListenConfig struct {
 	Config
-	StreamFactory StreamFactory
+	StreamManager StreamManager
 }
 
 type ConnectConfig struct {

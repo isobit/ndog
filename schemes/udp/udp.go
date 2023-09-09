@@ -46,7 +46,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			stream = existingStream
 		} else {
 			ndog.Logf(10, "creating new stream: %s", remoteAddrStr)
-			stream = cfg.StreamFactory.NewStream(remoteAddrStr)
+			stream = cfg.StreamManager.NewStream(remoteAddrStr)
 			// TODO close stream reader on timeout
 			streams[remoteAddrStr] = stream
 			go io.Copy(newUDPWriter(conn, remoteAddr), stream.Reader)

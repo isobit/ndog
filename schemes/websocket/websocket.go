@@ -29,7 +29,7 @@ func Listen(cfg ndog.ListenConfig) error {
 				ndog.Logf(2, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
 			wsHandler := websocket.Handler(func(conn *websocket.Conn) {
-				stream := cfg.StreamFactory.NewStream(r.RemoteAddr)
+				stream := cfg.StreamManager.NewStream(r.RemoteAddr)
 				defer stream.Close()
 
 				go io.Copy(conn, stream.Reader)

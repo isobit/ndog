@@ -97,7 +97,7 @@ func Listen(cfg ndog.ListenConfig) error {
 				return
 			}
 
-			stream := cfg.StreamFactory.NewStream(fmt.Sprintf("%s|%s %s", r.RemoteAddr, r.Method, r.URL))
+			stream := cfg.StreamManager.NewStream(fmt.Sprintf("%s|%s %s", r.RemoteAddr, r.Method, r.URL))
 			defer stream.Close()
 
 			if opts.JSON {

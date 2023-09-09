@@ -9,18 +9,18 @@ import (
 	"time"
 )
 
-type ExecStreamFactory struct {
+type ExecStreamManager struct {
 	Args      []string
 	TeeWriter io.Writer
 }
 
-func NewExecStreamFactory(args []string) *ExecStreamFactory {
-	return &ExecStreamFactory{
+func NewExecStreamManager(args []string) *ExecStreamManager {
+	return &ExecStreamManager{
 		Args: args,
 	}
 }
 
-func (f *ExecStreamFactory) NewStream(name string) Stream {
+func (f *ExecStreamManager) NewStream(name string) Stream {
 	cmd := exec.Command(f.Args[0], f.Args[1:]...)
 
 	stdin, err := cmd.StdinPipe()
@@ -104,17 +104,17 @@ func (f *ExecStreamFactory) NewStream(name string) Stream {
 	}
 }
 
-// type ExecTemplateStreamFactory struct {
+// type ExecTemplateStreamManager struct {
 // 	Name string
 // 	Args []string
 // }
 
-// func NewExecTemplateStreamFactory(name string, args ...string) *ExecTemplateStreamFactory {
-// 	return &ExecTemplateStreamFactory{
+// func NewExecTemplateStreamManager(name string, args ...string) *ExecTemplateStreamManager {
+// 	return &ExecTemplateStreamManager{
 // 		Name: name,
 // 		Args: args,
 // 	}
 // }
 
-// func (f *ExecTemplateStreamFactory) NewStream(name string) Stream {
+// func (f *ExecTemplateStreamManager) NewStream(name string) Stream {
 // }

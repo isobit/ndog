@@ -4,12 +4,12 @@ import (
 	"io"
 )
 
-type ProxyStreamFactory struct {
+type ProxyStreamManager struct {
 	ConnectConfig Config
 	Connect       func(ConnectConfig) error
 }
 
-func (f ProxyStreamFactory) NewStream(name string) Stream {
+func (f ProxyStreamManager) NewStream(name string) Stream {
 	Logf(10, "creating proxy pipe: %s", name)
 
 	listenReader, listenWriter := io.Pipe()

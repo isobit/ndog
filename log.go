@@ -30,18 +30,18 @@ func defaultLogf(level int, format string, v ...interface{}) (int, error) {
 	return fmt.Fprintf(Log, format, v...)
 }
 
-type LogStreamFactory struct {
-	StreamFactory
+type LogStreamManager struct {
+	StreamManager
 }
 
-func NewLogStreamFactory(delegate StreamFactory) *LogStreamFactory {
-	return &LogStreamFactory{
-		StreamFactory: delegate,
+func NewLogStreamManager(delegate StreamManager) *LogStreamManager {
+	return &LogStreamManager{
+		StreamManager: delegate,
 	}
 }
 
-func (f *LogStreamFactory) NewStream(name string) Stream {
-	stream := f.StreamFactory.NewStream(name)
+func (f *LogStreamManager) NewStream(name string) Stream {
+	stream := f.StreamManager.NewStream(name)
 	return streamWithLogging(
 		stream,
 		func(p []byte) {
