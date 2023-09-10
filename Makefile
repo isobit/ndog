@@ -1,9 +1,12 @@
 .PHONY: all build fmt test lint
 
+VERSION := $(if $(VERSION),$(VERSION),$(shell git describe --tags --match 'v*' HEAD))
+LDFLAGS := -X github.com/isobit/ndog.Version=$(VERSION)
+
 all: build fmt lint test
 
 build:
-	go build ./cmd/ndog.go
+	go build -ldflags "$(LDFLAGS)" -o ndog ./cmd/ndog.go
 
 fmt:
 	go fmt ./...

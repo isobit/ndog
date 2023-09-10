@@ -49,6 +49,8 @@ type Ndog struct {
 	Debug    bool `cli:"help=maximum logging"`
 	LogLevel int  `cli:"hidden"`
 	LogIO    bool `cli:"help=log all I/O"`
+
+	Version bool `cli:"short=V,help=show version"`
 }
 
 func (cmd Ndog) Run() error {
@@ -57,6 +59,10 @@ func (cmd Ndog) Run() error {
 	}
 	if cmd.SchemeHelp != "" {
 		return schemeHelp(cmd.SchemeHelp)
+	}
+	if cmd.Version {
+		fmt.Fprintln(os.Stderr, ndog.Version)
+		return nil
 	}
 
 	switch {
