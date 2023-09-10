@@ -30,13 +30,13 @@ type StdIOStreamManager struct {
 }
 
 func NewStdIOStreamManager(fixedData []byte) *StdIOStreamManager {
-	f := &StdIOStreamManager{}
+	m := &StdIOStreamManager{}
 
 	if fixedData == nil {
 		fanout := FanoutStdin()
-		f.readCloserFunc = fanout.Tee
+		m.readCloserFunc = fanout.Tee
 	} else {
-		f.readCloserFunc = func() io.ReadCloser {
+		m.readCloserFunc = func() io.ReadCloser {
 			var buf bytes.Buffer
 			if fixedData != nil {
 				buf.Write(fixedData)
@@ -45,11 +45,11 @@ func NewStdIOStreamManager(fixedData []byte) *StdIOStreamManager {
 		}
 	}
 
-	return f
+	return m
 }
 
-func (f *StdIOStreamManager) NewStream(name string) Stream {
-	rc := f.readCloserFunc()
+func (m *StdIOStreamManager) NewStream(name string) Stream {
+	rc := m.readCloserFunc()
 	return Stream{
 		Reader: rc,
 		Writer: NopWriteCloser(os.Stdout),
