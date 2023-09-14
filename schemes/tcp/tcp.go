@@ -37,25 +37,35 @@ func Listen(cfg ndog.ListenConfig) error {
 	ndog.Logf(0, "listening: %s", listener.Addr())
 
 	handleConn := func(conn *net.TCPConn) {
-		defer conn.Close()
-
 		remoteAddr := conn.RemoteAddr()
+		ndog.Logf(1, "accepted: %s", remoteAddr)
+		defer func() {
+			conn.Close()
+			ndog.Logf(1, "closed: %s", remoteAddr)
+		}()
 
 		stream := cfg.StreamManager.NewStream(remoteAddr.String())
+		defer stream.Close()
 
 		// Handle conn <- stream
 		go func() {
-			defer stream.Reader.Close()
-			io.Copy(conn, stream.Reader)
+			if _, err := io.Copy(conn, stream.Reader); err != nil {
+				ndog.Logf(-1, "write error: %s", err)
+				if err == net.ErrClosed {
+					stream.Close()
+				}
+			}
 		}()
 
 		// Handle conn -> stream
-		defer stream.Writer.Close()
 		buf := make([]byte, 1024)
 		for {
 			nr, err := conn.Read(buf)
 			if err != nil {
 				ndog.Logf(-1, "conn read error: %s", err)
+				if err == net.ErrClosed {
+					stream.Close()
+				}
 				return
 			}
 			_, err = stream.Writer.Write(buf[:nr])
@@ -76,11 +86,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			}
 			continue
 		}
-		ndog.Logf(1, "accepted: %s", conn.RemoteAddr())
-		go func() {
-			handleConn(conn)
-			ndog.Logf(1, "closed: %s", conn.RemoteAddr())
-		}()
+		go handleConn(conn)
 	}
 }
 
@@ -94,23 +100,33 @@ func Connect(cfg ndog.ConnectConfig) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-
 	remoteAddr := conn.RemoteAddr()
 	ndog.Logf(0, "connected: %s", remoteAddr)
+	defer func() {
+		conn.Close()
+		ndog.Logf(0, "closed: %s", remoteAddr)
+	}()
 
 	stream := cfg.Stream
 
 	go func() {
-		defer stream.Reader.Close()
-		io.Copy(conn, stream.Reader)
+		if _, err := io.Copy(conn, stream.Reader); err != nil {
+			ndog.Logf(-1, "write error: %s", err)
+			if err == net.ErrClosed {
+				stream.Close()
+			}
+		}
 	}()
 
-	defer stream.Writer.Close()
-	_, err = io.Copy(stream.Writer, conn)
+	if _, err = io.Copy(stream.Writer, conn); err != nil {
+		ndog.Logf(-1, "read error: %s", err)
+		if err == net.ErrClosed {
+			stream.Close()
+		}
+		return err
+	}
 
-	ndog.Logf(0, "closed: %s", remoteAddr)
-	return err
+	return nil
 }
 
 type Request struct {

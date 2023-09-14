@@ -153,6 +153,7 @@ func (cmd Ndog) Run() error {
 		})
 	case connectScheme != nil:
 		stream := streamManager.NewStream(cmd.ConnectURL.String())
+		defer stream.Close()
 		return connectScheme.Connect(ndog.ConnectConfig{
 			Config: ndog.Config{
 				URL:     cmd.ConnectURL,
