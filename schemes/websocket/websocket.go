@@ -1,12 +1,15 @@
 package websocket
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
-	"io"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
-	"golang.org/x/net/websocket"
+	"github.com/gorilla/websocket"
 
 	"github.com/isobit/ndog"
 )
@@ -51,28 +54,55 @@ func Listen(cfg ndog.ListenConfig) error {
 			for key, values := range r.Header {
 				ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
-			wsHandler := websocket.Handler(func(conn *websocket.Conn) {
-				stream := cfg.StreamManager.NewStream(r.RemoteAddr)
-				defer stream.Close()
+			upgrader := &websocket.Upgrader{}
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				// TODO
+				return
+			}
+			defer func() {
+				conn.Close()
+				ndog.Logf(1, "closed: %s", r.RemoteAddr)
+			}()
+			ndog.Logf(2, "upgraded %s", r.RemoteAddr)
 
-				go io.Copy(conn, stream.Reader)
+			stream := cfg.StreamManager.NewStream(r.RemoteAddr)
+			defer stream.Close()
 
-				buf := make([]byte, 1024)
+			go func() {
 				for {
-					nr, err := conn.Read(buf)
+					msgType, msg, err := conn.ReadMessage()
 					if err != nil {
+						ndog.Logf(-1, "read message error: %s", err)
+						if errors.Is(err, net.ErrClosed) {
+							stream.Close()
+						}
 						return
 					}
-					ndog.Logf(2, "read: %d bytes from %s", nr, r.RemoteAddr)
-
-					_, err = stream.Writer.Write(buf[:nr])
-					if err != nil {
+					ndog.Logf(2, "received message: %v", msgType)
+					if _, err := stream.Writer.Write(msg); err != nil {
+						ndog.Logf(-1, "write message error: %s", err)
 						return
 					}
+					fmt.Fprintln(stream.Writer)
 				}
-			})
-			wsHandler.ServeHTTP(w, r)
-			ndog.Logf(1, "closed: %s", r.RemoteAddr)
+
+			}()
+
+			s := bufio.NewScanner(stream.Reader)
+			for s.Scan() {
+				if err := conn.WriteMessage(websocket.BinaryMessage, s.Bytes()); err != nil {
+					ndog.Logf(-1, "write message error: %s", err)
+					if errors.Is(err, net.ErrClosed) {
+						stream.Close()
+					}
+					return
+				}
+				ndog.Logf(2, "sent message")
+			}
+			if err := s.Err(); err != nil {
+				ndog.Logf(2, "scan err: %s", err)
+			}
 		}),
 	}
 	ndog.Logf(0, "listening: %s", s.Addr)
@@ -123,31 +153,61 @@ func Connect(cfg ndog.ConnectConfig) error {
 		return err
 	}
 
-	wsCfg, err := websocket.NewConfig(cfg.URL.String(), opts.Origin)
-	if err != nil {
-		return err
-	}
-	if opts.Protocol != "" {
-		wsCfg.Protocol = []string{opts.Protocol}
-	}
+	header := http.Header{}
 	for key, val := range opts.Headers {
-		wsCfg.Header.Add(key, val)
+		header.Add(key, val)
 	}
 
-	conn, err := websocket.DialConfig(wsCfg)
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 10 * time.Second,
+	}
+	if opts.Protocol != "" {
+		dialer.Subprotocols = []string{opts.Protocol}
+	}
+
+	conn, _, err := dialer.Dial(cfg.URL.String(), header)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
 
 	remoteAddr := conn.RemoteAddr()
 	ndog.Logf(0, "connected: %s", remoteAddr)
+	defer func() {
+		conn.Close()
+		ndog.Logf(0, "closed: %s", remoteAddr)
+	}()
 
 	stream := cfg.Stream
 
-	go io.Copy(conn, stream.Reader)
-	_, err = io.Copy(stream.Writer, conn)
+	go func() {
+		defer stream.Writer.Close()
+		for {
+			msgType, msg, err := conn.ReadMessage()
+			if err != nil {
+				ndog.Logf(-1, "read message error: %s", err)
+				if errors.Is(err, net.ErrClosed) {
+					stream.Close()
+				}
+				return
+			}
+			ndog.Logf(2, "received message: %v", msgType)
+			if _, err := stream.Writer.Write(msg); err != nil {
+				ndog.Logf(-1, "write message error: %s", err)
+				return
+			}
+			fmt.Fprintln(stream.Writer)
+		}
+	}()
 
-	ndog.Logf(0, "closed: %s", remoteAddr)
-	return err
+	defer stream.Reader.Close()
+	s := bufio.NewScanner(stream.Reader)
+	for s.Scan() {
+		if err := conn.WriteMessage(websocket.BinaryMessage, s.Bytes()); err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				stream.Close()
+			}
+			return err
+		}
+	}
+	return s.Err()
 }

@@ -5,10 +5,10 @@ go 1.18
 require (
 	github.com/gliderlabs/ssh v0.3.5
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
+	github.com/gorilla/websocket v1.5.0
 	github.com/isobit/cli v0.10.2
 	github.com/jackc/pgx/v5 v5.4.3
 	github.com/tinylib/msgp v1.1.8
-	golang.org/x/net v0.14.0
 )
 
 require (
