@@ -1,9 +1,12 @@
 package tcp
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
+
+	"github.com/sourcegraph/conc"
 
 	"github.com/isobit/ndog"
 )
@@ -40,30 +43,13 @@ func Listen(cfg ndog.ListenConfig) error {
 		defer conn.Close()
 
 		remoteAddr := conn.RemoteAddr()
+		ndog.Logf(1, "accepted: %s", remoteAddr)
+		defer ndog.Logf(1, "closed: %s", remoteAddr)
 
 		stream := cfg.StreamManager.NewStream(remoteAddr.String())
+		defer stream.Close()
 
-		// Handle conn <- stream
-		go func() {
-			defer stream.Reader.Close()
-			io.Copy(conn, stream.Reader)
-		}()
-
-		// Handle conn -> stream
-		defer stream.Writer.Close()
-		buf := make([]byte, 1024)
-		for {
-			nr, err := conn.Read(buf)
-			if err != nil {
-				ndog.Logf(-1, "conn read error: %s", err)
-				return
-			}
-			_, err = stream.Writer.Write(buf[:nr])
-			if err != nil {
-				ndog.Logf(-1, "stream write error: %s", err)
-				return
-			}
-		}
+		bidirectionalCopy(conn, stream)
 	}
 
 	for {
@@ -76,11 +62,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			}
 			continue
 		}
-		ndog.Logf(1, "accepted: %s", conn.RemoteAddr())
-		go func() {
-			handleConn(conn)
-			ndog.Logf(1, "closed: %s", conn.RemoteAddr())
-		}()
+		go handleConn(conn)
 	}
 }
 
@@ -98,19 +80,36 @@ func Connect(cfg ndog.ConnectConfig) error {
 
 	remoteAddr := conn.RemoteAddr()
 	ndog.Logf(0, "connected: %s", remoteAddr)
+	defer ndog.Logf(0, "closed: %s", remoteAddr)
 
-	stream := cfg.Stream
+	bidirectionalCopy(conn, cfg.Stream)
 
-	go func() {
-		defer stream.Reader.Close()
-		io.Copy(conn, stream.Reader)
-	}()
+	return nil
+}
 
-	defer stream.Writer.Close()
-	_, err = io.Copy(stream.Writer, conn)
+func bidirectionalCopy(conn *net.TCPConn, stream ndog.Stream) {
+	wg := conc.WaitGroup{}
+	wg.Go(func() {
+		defer conn.Close()
+		defer stream.Close()
 
-	ndog.Logf(0, "closed: %s", remoteAddr)
-	return err
+		if _, err := io.Copy(conn, stream.Reader); err != nil {
+			if !ndog.IsIOClosedErr(err) && !errors.Is(err, net.ErrClosed) {
+				ndog.Logf(-1, "write error: %s", err)
+			}
+		}
+	})
+	wg.Go(func() {
+		defer conn.Close()
+		defer stream.Close()
+
+		if _, err := io.Copy(stream.Writer, conn); err != nil {
+			if !ndog.IsIOClosedErr(err) && !errors.Is(err, net.ErrClosed) {
+				ndog.Logf(-1, "read error: %s", err)
+			}
+		}
+	})
+	wg.Wait()
 }
 
 type Request struct {
