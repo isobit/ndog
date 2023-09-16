@@ -1,12 +1,15 @@
-.PHONY: all build fmt test lint
+NAME := ndog
+PACKAGE := github.com/isobit/ndog
 
 VERSION := $(if $(VERSION),$(VERSION),$(shell git describe --tags --match 'v*' HEAD))
-LDFLAGS := -X github.com/isobit/ndog.Version=$(VERSION)
+LDFLAGS := -X $(PACKAGE).Version=$(VERSION)
+
+.PHONY: all build fmt test lint
 
 all: build fmt lint test
 
 build:
-	go build -ldflags "$(LDFLAGS)" -o ndog ./cmd/ndog.go
+	go build -ldflags "$(LDFLAGS)" ./cmd/$(NAME).go
 
 fmt:
 	go fmt ./...
@@ -20,7 +23,7 @@ test:
 	# go test ./...
 
 clean:
-	rm ndog
+	rm $(NAME)
 	rm -rf _dist
 
 DIST_OS_ARCH := \
@@ -29,12 +32,12 @@ DIST_OS_ARCH := \
 	darwin-amd64 \
 	darwin-arm64
 
-DISTS := $(DIST_OS_ARCH:%=_dist/ndog-%)
+DISTS := $(DIST_OS_ARCH:%=_dist/$(NAME)-%)
 
 .PHONY: dist $(DISTS)
 dist: $(DISTS)
 
-$(DISTS): _dist/ndog-%:
+$(DISTS): _dist/$(NAME)-%:
 	mkdir -p _dist
 	CGO_ENABLED=0 GOOS=$(word 1,$(subst -, ,$*)) GOARCH=$(word 2,$(subst -, ,$*)) \
-		go build -ldflags "$(LDFLAGS)" -o $@ ./cmd/ndog.go
+		go build -ldflags "$(LDFLAGS)" -o $@ ./cmd/$(NAME).go
