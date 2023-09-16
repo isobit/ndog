@@ -177,10 +177,14 @@ func WriteJSON[T any](stream Stream, v T) error {
 type funcReadCloser struct {
 	io.Reader
 	closeFunc func() error
-	closed    bool
+
+	sync.Mutex
+	closed bool
 }
 
 func (frc *funcReadCloser) Close() error {
+	frc.Lock()
+	defer frc.Unlock()
 	if frc.closed {
 		return nil
 	}
@@ -198,22 +202,17 @@ func FuncReadCloser(r io.Reader, f func() error) io.ReadCloser {
 	}
 }
 
-func TeeReadCloser(r io.ReadCloser, w io.WriteCloser) io.ReadCloser {
-	tr := io.TeeReader(r, w)
-	return FuncReadCloser(tr, func() error {
-		r.Close()
-		w.Close()
-		return nil
-	})
-}
-
 type funcWriteCloser struct {
 	io.Writer
 	closeFunc func() error
-	closed    bool
+
+	sync.Mutex
+	closed bool
 }
 
 func (fwc *funcWriteCloser) Close() error {
+	fwc.Lock()
+	defer fwc.Unlock()
 	if fwc.closed {
 		return nil
 	}
@@ -229,6 +228,15 @@ func FuncWriteCloser(w io.Writer, f func() error) io.WriteCloser {
 		Writer:    w,
 		closeFunc: f,
 	}
+}
+
+func TeeReadCloser(r io.ReadCloser, w io.WriteCloser) io.ReadCloser {
+	tr := io.TeeReader(r, w)
+	return FuncReadCloser(tr, func() error {
+		r.Close()
+		w.Close()
+		return nil
+	})
 }
 
 func MultiWriteCloser(writerClosers ...io.WriteCloser) io.WriteCloser {
