@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"sync"
 )
@@ -262,4 +264,8 @@ type nopWriteCloser struct {
 
 func (nwc nopWriteCloser) Close() error {
 	return nil
+}
+
+func IsIOClosedErr(err error) bool {
+	return errors.Is(err, io.ErrClosedPipe) || errors.Is(err, fs.ErrClosed)
 }
