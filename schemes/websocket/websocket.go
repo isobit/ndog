@@ -196,14 +196,13 @@ func bidirectionalCopy(conn *websocket.Conn, stream ndog.Stream, sendMsgType int
 				}
 				return
 			}
-			ndog.Logf(2, "received message: %v", msgType)
-			if _, err := stream.Writer.Write(msg); err != nil {
+			ndog.Logf(2, "received message (type=%d)", msgType)
+			if _, err := stream.Writer.Write(append(msg, '\n')); err != nil {
 				if !ndog.IsIOClosedErr(err) {
 					ndog.Logf(-1, "read error: %s", err)
 				}
 				return
 			}
-			fmt.Fprintln(stream.Writer)
 		}
 	})
 	wg.Go(func() {
