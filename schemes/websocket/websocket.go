@@ -28,6 +28,7 @@ Listen starts a WebSocket server on the host and port specified in the URL.
 Examples:
 	Echo server: ndog -l 'ws://localhost:8080' -x 'cat'
 	`,
+	ListenOptionHelp:  listenOptionHelp,
 	ConnectOptionHelp: connectOptionHelp,
 }
 
@@ -41,10 +42,34 @@ Connect opens a WebSocket connection to the specified URL.
 	ConnectOptionHelp: connectOptionHelp,
 }
 
+type ListenOptions struct {
+	MessageType int
+}
+
+var listenOptionHelp = ndog.OptionsHelp{}.
+	Add("text", "", "Send using text data frames instead of binary")
+
+func extractListenOptions(opts ndog.Options) (ConnectOptions, error) {
+	o := ConnectOptions{
+		MessageType: websocket.BinaryMessage,
+	}
+
+	if _, ok := opts.Pop("text"); ok {
+		o.MessageType = websocket.TextMessage
+	}
+
+	return o, opts.Done()
+}
 func Listen(cfg ndog.ListenConfig) error {
 	if cfg.URL.Scheme == "wss" {
 		return fmt.Errorf("listen does not support secure websockets yet")
 	}
+
+	opts, err := extractListenOptions(cfg.Options)
+	if err != nil {
+		return err
+	}
+
 	s := &http.Server{
 		Addr: cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +95,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			stream := cfg.StreamManager.NewStream(r.RemoteAddr)
 			defer stream.Close()
 
-			bidirectionalCopy(conn, stream)
+			bidirectionalCopy(conn, stream, opts.MessageType)
 		}),
 	}
 	ndog.Logf(0, "listening: %s", s.Addr)
@@ -78,20 +103,23 @@ func Listen(cfg ndog.ListenConfig) error {
 }
 
 type ConnectOptions struct {
-	Origin   string
-	Protocol string
-	Headers  map[string]string
+	Origin      string
+	Protocol    string
+	Headers     map[string]string
+	MessageType int
 }
 
 var connectOptionHelp = ndog.OptionsHelp{}.
 	Add("header.<NAME>", "<VALUE>", "extra request headers to send").
 	Add("origin", "<ORIGIN>", "").
-	Add("protocol", "<PROTOCOL>", "")
+	Add("protocol", "<PROTOCOL>", "").
+	Add("text", "", "Send using text data frames instead of binary")
 
 func extractConnectOptions(opts ndog.Options) (ConnectOptions, error) {
 	o := ConnectOptions{
-		Origin:  "http://localhost",
-		Headers: map[string]string{},
+		Origin:      "http://localhost",
+		Headers:     map[string]string{},
+		MessageType: websocket.BinaryMessage,
 	}
 
 	if val, ok := opts.Pop("origin"); ok {
@@ -100,6 +128,10 @@ func extractConnectOptions(opts ndog.Options) (ConnectOptions, error) {
 
 	if val, ok := opts.Pop("protocol"); ok {
 		o.Protocol = val
+	}
+
+	if _, ok := opts.Pop("text"); ok {
+		o.MessageType = websocket.TextMessage
 	}
 
 	headerKeyPrefix := "header."
@@ -145,12 +177,12 @@ func Connect(cfg ndog.ConnectConfig) error {
 		ndog.Logf(0, "closed: %s", remoteAddr)
 	}()
 
-	bidirectionalCopy(conn, cfg.Stream)
+	bidirectionalCopy(conn, cfg.Stream, opts.MessageType)
 
 	return nil
 }
 
-func bidirectionalCopy(conn *websocket.Conn, stream ndog.Stream) {
+func bidirectionalCopy(conn *websocket.Conn, stream ndog.Stream, sendMsgType int) {
 	wg := conc.WaitGroup{}
 	wg.Go(func() {
 		defer conn.Close()
@@ -180,7 +212,7 @@ func bidirectionalCopy(conn *websocket.Conn, stream ndog.Stream) {
 
 		s := bufio.NewScanner(stream.Reader)
 		for s.Scan() {
-			if err := conn.WriteMessage(websocket.BinaryMessage, s.Bytes()); err != nil {
+			if err := conn.WriteMessage(sendMsgType, s.Bytes()); err != nil {
 				if !errors.Is(err, net.ErrClosed) {
 					ndog.Logf(-1, "write error: %s", err)
 				}
