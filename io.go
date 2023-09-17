@@ -1,81 +1,15 @@
 package ndog
 
 import (
-	"bufio"
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 	"sync"
 )
 
-type Stream struct {
-	Reader io.ReadCloser
-	Writer io.WriteCloser
-}
-
-func (stream Stream) Close() error {
-	stream.Reader.Close()
-	stream.Writer.Close()
-	return nil
-}
-
-type StreamManager interface {
-	NewStream(name string) Stream
-}
-
-type StdIOStreamManager struct {
-	readCloserFunc func() io.ReadCloser
-}
-
-func NewStdIOStreamManager(fixedData []byte) *StdIOStreamManager {
-	m := &StdIOStreamManager{}
-
-	if fixedData != nil {
-		m.readCloserFunc = func() io.ReadCloser {
-			var buf bytes.Buffer
-			buf.Write(fixedData)
-			return io.NopCloser(&buf)
-		}
-	} else {
-		fanout := FanoutStdin()
-		m.readCloserFunc = fanout.Tee
-	}
-
-	return m
-}
-
-func (m *StdIOStreamManager) NewStream(name string) Stream {
-	rc := m.readCloserFunc()
-	return Stream{
-		Reader: rc,
-		Writer: NopWriteCloser(os.Stdout),
-	}
-}
-
-func FanoutStdin() *Fanout {
-	fanout := NewFanout()
-	go func() {
-		defer fanout.Close()
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			data := scanner.Bytes()
-			Logf(10, "stdin data: %s", data)
-			if _, err := fanout.Write(data); err != nil {
-				return
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			Logf(-1, "stdin scan error: %s", err)
-		} else {
-			Logf(10, "stdin EOF")
-		}
-		// os.Exit(1) // TODO clean shutdown
-	}()
-	return fanout
+func IsIOClosedErr(err error) bool {
+	return errors.Is(err, io.ErrClosedPipe) || errors.Is(err, fs.ErrClosed)
 }
 
 type Fanout struct {
@@ -127,7 +61,6 @@ func (f *Fanout) Write(p []byte) (int, error) {
 		if err != nil {
 			continue
 		}
-		w.Write([]byte{'\n'})
 		openWriters = append(openWriters, w)
 	}
 	f.writers = openWriters
@@ -150,30 +83,6 @@ func (f *Fanout) Tee() io.ReadCloser {
 	}
 
 	return pr
-}
-
-func ReadJSON[T any](stream Stream) (*T, error) {
-	readData, err := io.ReadAll(stream.Reader)
-	if err != nil {
-		return nil, err
-	}
-	var v T
-	if err := json.Unmarshal(readData, &v); err != nil {
-		return nil, err
-	}
-	return &v, nil
-}
-
-func WriteJSON[T any](stream Stream, v T) error {
-	writeData, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	w := stream.Writer
-	w.Write(writeData)
-	io.WriteString(w, "\n")
-	w.Close()
-	return nil
 }
 
 type funcReadCloser struct {
@@ -264,8 +173,4 @@ type nopWriteCloser struct {
 
 func (nwc nopWriteCloser) Close() error {
 	return nil
-}
-
-func IsIOClosedErr(err error) bool {
-	return errors.Is(err, io.ErrClosedPipe) || errors.Is(err, fs.ErrClosed)
 }
