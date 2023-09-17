@@ -199,7 +199,7 @@ func extractConnectOptions(opts ndog.Options) (connectOptions, error) {
 		o.JSON = true
 	}
 	if val, ok := opts.Pop("method"); ok {
-		o.Method = val
+		o.Method = strings.ToUpper(val)
 	}
 
 	headerKeyPrefix := "header."
