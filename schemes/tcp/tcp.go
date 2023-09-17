@@ -87,6 +87,15 @@ func Connect(cfg ndog.ConnectConfig) error {
 	return nil
 }
 
+type Request struct {
+	RemoteAddr string
+	Data       []byte
+}
+
+type Response struct {
+	Data []byte
+}
+
 func bidirectionalCopy(conn *net.TCPConn, stream ndog.Stream) {
 	wg := conc.WaitGroup{}
 	wg.Go(func() {
@@ -110,13 +119,4 @@ func bidirectionalCopy(conn *net.TCPConn, stream ndog.Stream) {
 		}
 	})
 	wg.Wait()
-}
-
-type Request struct {
-	RemoteAddr string
-	Data       []byte
-}
-
-type Response struct {
-	Data []byte
 }
