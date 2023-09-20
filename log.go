@@ -61,22 +61,20 @@ func streamWithLogging(stream Stream, logRecv func([]byte), logSend func([]byte)
 		for {
 			n, err := recvReader.Read(buf)
 			if err != nil {
-				break
+				return
 			}
 			logRecv(buf[:n])
 		}
-		// Logf(10, "log done scanning recvs %s", name)
 	}()
 	go func() {
 		buf := make([]byte, 1024)
 		for {
 			n, err := sendReader.Read(buf)
 			if err != nil {
-				break
+				return
 			}
 			logSend(buf[:n])
 		}
-		// Logf(10, "log done scanning sends %s", name)
 	}()
 	return Stream{
 		Reader: TeeReadCloser(stream.Reader, sendWriter),
