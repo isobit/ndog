@@ -45,7 +45,7 @@ func FanoutStdin() *Fanout {
 			}
 		}
 		Logf(10, "stdin EOF")
-		os.Exit(1) // TODO clean shutdown
+		// os.Exit(1) // TODO clean shutdown
 	}()
 	return fanout
 }
