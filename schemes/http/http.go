@@ -224,8 +224,16 @@ func Connect(cfg ndog.ConnectConfig) error {
 		return ConnectJSON(cfg)
 	}
 
+	// net/http hangs when io.Pipe is used as request body so collect it all
+	// into a simple buffer reader.
+	// https://github.com/golang/go/issues/29246
+	body, err := io.ReadAll(cfg.Stream.Reader)
+	if err != nil {
+		return err
+	}
+
 	// Convert to HTTP request
-	httpReq, err := http.NewRequest(opts.Method, cfg.URL.String(), cfg.Stream.Reader)
+	httpReq, err := http.NewRequest(opts.Method, cfg.URL.String(), bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
