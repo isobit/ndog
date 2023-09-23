@@ -16,6 +16,7 @@ import (
 var Scheme = &ndog.Scheme{
 	Names:   []string{"postgres"},
 	Connect: Connect,
+	Listen:  Listen,
 
 	Description: `
 Connect sends input to the specified PostgreSQL server and outputs the returned rows.
@@ -26,12 +27,12 @@ Example: ndog -c 'postgres://localhost' -d 'select now();'
 		Add("json", "", "use JSON representation for returned rows"),
 }
 
-type Options struct {
+type ConnectOptions struct {
 	JSON bool
 }
 
-func extractOptions(opts ndog.Options) (Options, error) {
-	o := Options{}
+func extractConnectOptions(opts ndog.Options) (ConnectOptions, error) {
+	o := ConnectOptions{}
 	if _, ok := opts.Pop("json"); ok {
 		o.JSON = true
 	}
@@ -39,7 +40,7 @@ func extractOptions(opts ndog.Options) (Options, error) {
 }
 
 func Connect(cfg ndog.ConnectConfig) error {
-	opts, err := extractOptions(cfg.Options)
+	opts, err := extractConnectOptions(cfg.Options)
 	if err != nil {
 		return err
 	}
