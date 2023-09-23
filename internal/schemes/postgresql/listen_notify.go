@@ -28,7 +28,7 @@ Example: ndog -c 'postgres+listen://localhost#foo,bar'
 }
 
 func listenConnect(cfg ndog.ConnectConfig) error {
-	opts, err := extractOptions(cfg.Options)
+	opts, err := extractConnectOptions(cfg.Options)
 	if err != nil {
 		return err
 	}
