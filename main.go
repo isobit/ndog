@@ -11,9 +11,11 @@ import (
 	"github.com/google/shlex"
 	"github.com/isobit/cli"
 
-	"github.com/isobit/ndog"
-	"github.com/isobit/ndog/schemes"
+	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/schemes"
 )
+
+var Version string = "unknown"
 
 func main() {
 	if stderrStat, err := os.Stderr.Stat(); err == nil {
@@ -61,7 +63,7 @@ func (cmd Ndog) Run() error {
 		return schemeHelp(cmd.SchemeHelp)
 	}
 	if cmd.Version {
-		fmt.Fprintln(os.Stderr, ndog.Version)
+		fmt.Fprintln(os.Stderr, Version)
 		return nil
 	}
 

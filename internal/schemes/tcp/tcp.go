@@ -8,7 +8,7 @@ import (
 
 	"github.com/sourcegraph/conc"
 
-	"github.com/isobit/ndog"
+	"github.com/isobit/ndog/internal"
 )
 
 var Scheme = &ndog.Scheme{

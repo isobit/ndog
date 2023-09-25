@@ -10,7 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/isobit/ndog"
+	"github.com/isobit/ndog/internal"
 )
 
 var Scheme = &ndog.Scheme{

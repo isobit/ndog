@@ -3,13 +3,13 @@ package schemes
 import (
 	"fmt"
 
-	"github.com/isobit/ndog"
-	"github.com/isobit/ndog/schemes/http"
-	"github.com/isobit/ndog/schemes/postgresql"
-	"github.com/isobit/ndog/schemes/ssh"
-	"github.com/isobit/ndog/schemes/tcp"
-	"github.com/isobit/ndog/schemes/udp"
-	"github.com/isobit/ndog/schemes/websocket"
+	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/schemes/http"
+	"github.com/isobit/ndog/internal/schemes/postgresql"
+	"github.com/isobit/ndog/internal/schemes/ssh"
+	"github.com/isobit/ndog/internal/schemes/tcp"
+	"github.com/isobit/ndog/internal/schemes/udp"
+	"github.com/isobit/ndog/internal/schemes/websocket"
 )
 
 func init() {
