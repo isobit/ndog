@@ -6,7 +6,7 @@ import (
 
 	"github.com/gliderlabs/ssh"
 
-	"github.com/isobit/ndog"
+	"github.com/isobit/ndog/internal"
 )
 
 var Scheme = &ndog.Scheme{

@@ -11,7 +11,7 @@ import (
 
 	"github.com/tinylib/msgp/msgp"
 
-	"github.com/isobit/ndog"
+	"github.com/isobit/ndog/internal"
 )
 
 var HTTPScheme = &ndog.Scheme{
