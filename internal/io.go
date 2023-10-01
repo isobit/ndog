@@ -1,6 +1,7 @@
 package ndog
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,26 @@ import (
 
 func IsIOClosedErr(err error) bool {
 	return errors.Is(err, io.ErrClosedPipe) || errors.Is(err, fs.ErrClosed)
+}
+
+func ReadJSON[T any](r io.Reader) (*T, error) {
+	var v T
+	d := json.NewDecoder(r)
+	if err := d.Decode(&v); err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func WriteJSON[T any](w io.Writer, v T) error {
+	e := json.NewEncoder(w)
+	if err := e.Encode(v); err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte{'\n'}); err != nil {
+		return err
+	}
+	return nil
 }
 
 type Fanout struct {
