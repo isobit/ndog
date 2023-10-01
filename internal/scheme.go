@@ -69,3 +69,13 @@ type OptionHelp struct {
 	Value       string
 	Description string
 }
+
+func SplitURLSubscheme(url *url.URL) (*url.URL, string) {
+	if url == nil {
+		return nil, ""
+	}
+	urlCopy := *url
+	scheme, subscheme, _ := strings.Cut(url.Scheme, "+")
+	urlCopy.Scheme = scheme
+	return &urlCopy, subscheme
+}

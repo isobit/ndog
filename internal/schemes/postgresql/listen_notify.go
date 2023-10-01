@@ -14,7 +14,7 @@ import (
 )
 
 var ListenScheme = &ndog.Scheme{
-	Names:   []string{"postgresql+listen", "postgres+listen", "pg+listen"},
+	Names:   []string{"postgres+listen"},
 	Connect: listenConnect,
 
 	Description: `
@@ -38,8 +38,7 @@ func listenConnect(cfg ndog.ConnectConfig) error {
 	}
 	channelNames := strings.Split(cfg.URL.Fragment, ",")
 
-	connUrl := *cfg.URL
-	connUrl.Scheme = "postgresql"
+	connUrl, _ := ndog.SplitURLSubscheme(cfg.URL)
 	connUrl.Fragment = ""
 
 	ctx := context.Background()
@@ -83,7 +82,7 @@ func listenConnect(cfg ndog.ConnectConfig) error {
 }
 
 var NotifyScheme = &ndog.Scheme{
-	Names:   []string{"postgresql+notify", "postgres+notify", "pg+notify"},
+	Names:   []string{"postgres+notify"},
 	Connect: notifyConnect,
 
 	Description: `
@@ -107,8 +106,7 @@ func notifyConnect(cfg ndog.ConnectConfig) error {
 		return fmt.Errorf("URL must include the channel name as a fragment")
 	}
 
-	connUrl := *cfg.URL
-	connUrl.Scheme = "postgresql"
+	connUrl, _ := ndog.SplitURLSubscheme(cfg.URL)
 	connUrl.Fragment = ""
 
 	ctx := context.Background()

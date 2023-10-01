@@ -14,7 +14,7 @@ import (
 )
 
 var Scheme = &ndog.Scheme{
-	Names:   []string{"postgresql", "postgres", "pg"},
+	Names:   []string{"postgres"},
 	Connect: Connect,
 
 	Description: `
@@ -44,11 +44,8 @@ func Connect(cfg ndog.ConnectConfig) error {
 		return err
 	}
 
-	connUrl := *cfg.URL
-	connUrl.Scheme = "postgresql"
-
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, connUrl.String())
+	conn, err := pgx.Connect(ctx, cfg.URL.String())
 	if err != nil {
 		return err
 	}
