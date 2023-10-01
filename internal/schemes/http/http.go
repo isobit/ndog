@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -44,6 +45,19 @@ Examples:
 	GET request: ndog -c 'https://example.net/' -d ''
 	`,
 	ConnectOptionHelp: connectOptionHelp,
+}
+
+var HTTPGraphQLScheme = &ndog.Scheme{
+	Names:   []string{"http+graphql", "https+graphql"},
+	Connect: Connect,
+
+	Description: `
+Connect sends input as an GraphQL query to the specified URL over an HTTP POST request.
+
+Examples:
+	./ndog -c https+graphql://countries.trevorblades.com/graphql -d 'query { countries { name } }'
+	`,
+	ConnectOptionHelp: connectOptionHelpGraphql,
 }
 
 type listenOptions struct {
@@ -122,7 +136,6 @@ func Listen(cfg ndog.ListenConfig) error {
 			stream := cfg.StreamManager.NewStream(fmt.Sprintf("%s|%s %s", r.RemoteAddr, r.Method, r.URL))
 			defer stream.Close()
 
-
 			// Receive request.
 			contentType := r.Header.Get("Content-Type")
 			if opts.MsgpackToJSON && (contentType == "application/msgpack" || contentType == "application/x-msgpack") {
@@ -135,12 +148,13 @@ func Listen(cfg ndog.ListenConfig) error {
 					ndog.Logf(-1, "error unmarshaling request body msgpack as JSON: %s", err)
 					return
 				}
-				io.WriteString(stream.Writer, "\n")
+				stream.Writer.Write([]byte{'\n'})
 			} else {
 				if _, err := io.Copy(stream.Writer, r.Body); err != nil {
 					ndog.Logf(-1, "error reading request body: %s", err)
 					return
 				}
+				stream.Writer.Write([]byte{'\n'})
 			}
 			stream.Writer.Close()
 
@@ -164,18 +178,29 @@ func Listen(cfg ndog.ListenConfig) error {
 type connectOptions struct {
 	Method  string
 	Headers map[string]string
+	GraphQL bool
 }
 
 var connectOptionHelp = ndog.OptionsHelp{}.
 	Add("header.<NAME>", "<VALUE>", "extra request headers to send").
 	Add("method", "<METHOD>", "HTTP method to use (default: GET)")
 
-func extractConnectOptions(opts ndog.Options) (connectOptions, error) {
+var connectOptionHelpGraphql = ndog.OptionsHelp{}.
+	Add("header.<NAME>", "<VALUE>", "extra request headers to send").
+	Add("method", "<METHOD>", "HTTP method to use (default: POST)")
+
+func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions, error) {
 	o := connectOptions{
 		Method:  "GET",
 		Headers: map[string]string{},
 	}
+
+	if subscheme == "graphql" {
+		o.GraphQL = true
+		o.Method = "POST"
+		o.Headers["Content-Type"] = "application/json"
 	}
+
 	if val, ok := opts.Pop("method"); ok {
 		o.Method = strings.ToUpper(val)
 	}
@@ -194,7 +219,9 @@ func extractConnectOptions(opts ndog.Options) (connectOptions, error) {
 }
 
 func Connect(cfg ndog.ConnectConfig) error {
-	opts, err := extractConnectOptions(cfg.Options)
+	reqUrl, subscheme := ndog.SplitURLSubscheme(cfg.URL)
+
+	opts, err := extractConnectOptions(cfg.Options, subscheme)
 	if err != nil {
 		return err
 	}
@@ -207,8 +234,18 @@ func Connect(cfg ndog.ConnectConfig) error {
 		return err
 	}
 
+	if opts.GraphQL {
+		bodyJson, err := json.Marshal(GraphQLRequest{
+			Query: string(body),
+		})
+		if err != nil {
+			return err
+		}
+		body = bodyJson
+	}
+
 	// Convert to HTTP request
-	httpReq, err := http.NewRequest(opts.Method, cfg.URL.String(), bytes.NewReader(body))
+	httpReq, err := http.NewRequest(opts.Method, reqUrl.String(), bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -221,7 +258,7 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	// Do request
-	ndog.Logf(0, "request: %s %s", opts.Method, cfg.URL.RequestURI())
+	ndog.Logf(0, "request: %s %s", opts.Method, reqUrl.RequestURI())
 	for key, values := range httpReq.Header {
 		ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 	}
@@ -234,43 +271,30 @@ func Connect(cfg ndog.ConnectConfig) error {
 	for key, values := range resp.Header {
 		ndog.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
 	}
-	if _, err := io.Copy(cfg.Stream.Writer, resp.Body); err != nil {
-		return err
+
+	if opts.GraphQL {
+		var bodyJson GraphQLResponse
+		if err := json.NewDecoder(resp.Body).Decode(&bodyJson); err != nil {
+			return fmt.Errorf("error decoding response: %w", err)
+		}
+		if bodyJson.Errors != nil && len(bodyJson.Errors) > 0 {
+			errorJson, err := json.Marshal(bodyJson.Errors)
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("errors in GraphQL response: %s", string(errorJson))
+		}
+		if err := json.NewEncoder(cfg.Stream.Writer).Encode(bodyJson.Data); err != nil {
+			return err
+		}
+	} else {
+		if _, err := io.Copy(cfg.Stream.Writer, resp.Body); err != nil {
+			return err
+		}
 	}
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf(resp.Status)
 	}
-	return nil
-}
-		}
-	}
-
-	// Do request
-	httpResp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		return err
-	}
-
-	ndog.Logf(0, "response: %s", httpResp.Status)
-
-	body, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		return err
-	}
-	httpResp.Body.Close()
-
-	resp := responseData{
-		StatusCode: httpResp.StatusCode,
-		Body:       string(body),
-		Headers:    map[string][]string{},
-	}
-	for key, values := range httpResp.Header {
-		resp.Headers[key] = values
-	}
-	if err := ndog.WriteJSON(stream, resp); err != nil {
-		return err
-	}
-
 	return nil
 }
