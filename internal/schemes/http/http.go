@@ -1,6 +1,8 @@
 package http
 
 import (
+	"log"
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -118,7 +120,17 @@ func Listen(cfg ndog.ListenConfig) error {
 		ndog.Logf(1, "http: will serve file(s) from %s", opts.ServeFile)
 	}
 
+	errLogReader, errLogWriter := io.Pipe()
+	defer errLogWriter.Close()
+	go func() {
+		s := bufio.NewScanner(errLogReader)
+		for s.Scan() {
+			ndog.Logf(-1, s.Text())
+		}
+	}()
+
 	s := &http.Server{
+		ErrorLog: log.New(errLogWriter, "", 0),
 		Addr: cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ndog.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
