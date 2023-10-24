@@ -15,7 +15,6 @@ import (
 func init() {
 	registerSchemes(
 		http.HTTPScheme,
-		http.HTTPSScheme,
 		http.HTTPGraphQLScheme,
 		postgresql.Scheme,
 		postgresql.ListenScheme,

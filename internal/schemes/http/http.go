@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"os"
+	"crypto/x509"
+	"crypto/tls"
 
 	"github.com/tinylib/msgp/msgp"
 
@@ -16,7 +19,7 @@ import (
 )
 
 var HTTPScheme = &ndog.Scheme{
-	Names:   []string{"http"},
+	Names:   []string{"http", "https"},
 	Connect: Connect,
 	Listen:  Listen,
 
@@ -32,19 +35,6 @@ Examples:
 	`,
 	ConnectOptionHelp: connectOptionHelp,
 	ListenOptionHelp:  listenOptionHelp,
-}
-
-var HTTPSScheme = &ndog.Scheme{
-	Names:   []string{"https"},
-	Connect: Connect,
-
-	Description: `
-Connect sends input as an HTTPS request body to the specified URL.
-
-Examples:
-	GET request: ndog -c 'https://example.net/' -d ''
-	`,
-	ConnectOptionHelp: connectOptionHelp,
 }
 
 var HTTPGraphQLScheme = &ndog.Scheme{
@@ -65,6 +55,9 @@ type listenOptions struct {
 	Headers       map[string]string
 	ServeFile     string
 	MsgpackToJSON bool
+
+	TLSCert string
+	TLSKey string
 }
 
 var listenOptionHelp = ndog.OptionsHelp{}.
@@ -104,6 +97,13 @@ func extractListenOptions(opts ndog.Options) (listenOptions, error) {
 		headerKey := strings.TrimPrefix(key, headerKeyPrefix)
 		o.Headers[headerKey] = val
 		delete(opts, key)
+	}
+
+	if val, ok := opts.Pop("cert"); ok {
+		o.TLSCert = val
+	}
+	if val, ok := opts.Pop("key"); ok {
+		o.TLSKey = val
 	}
 
 	return o, opts.Done()
@@ -172,12 +172,16 @@ func Listen(cfg ndog.ListenConfig) error {
 		}),
 	}
 	ndog.Logf(0, "listening: %s", s.Addr)
+	if cfg.URL.Scheme == "https" {
+		return s.ListenAndServeTLS(opts.TLSCert, opts.TLSKey)
+	}
 	return s.ListenAndServe()
 }
 
 type connectOptions struct {
 	Method  string
 	Headers map[string]string
+	CACert  string
 	GraphQL bool
 }
 
@@ -213,6 +217,10 @@ func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions,
 		headerKey := strings.TrimPrefix(key, headerKeyPrefix)
 		o.Headers[headerKey] = val
 		delete(opts, key)
+	}
+
+	if val, ok := opts.Pop("cacert"); ok {
+		o.CACert = val
 	}
 
 	return o, opts.Done()
@@ -257,12 +265,29 @@ func Connect(cfg ndog.ConnectConfig) error {
 		httpReq.Header.Add(key, val)
 	}
 
+	client := &http.Client{}
+	if opts.CACert != "" {
+		cert, err := os.ReadFile(opts.CACert)
+		if err != nil {
+			return fmt.Errorf("error reading CA cert %s: %w", opts.CACert, err)
+		}
+		certPool := x509.NewCertPool()
+		if ok := certPool.AppendCertsFromPEM(cert); !ok {
+			return fmt.Errorf("unable to parse CA cert %s", opts.CACert)
+		}
+		client.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: certPool,
+			},
+		}
+	}
+
 	// Do request
 	ndog.Logf(0, "request: %s %s", opts.Method, reqUrl.RequestURI())
 	for key, values := range httpReq.Header {
 		ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 	}
-	resp, err := http.DefaultClient.Do(httpReq)
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return err
 	}
