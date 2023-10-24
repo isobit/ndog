@@ -1,19 +1,19 @@
 package http
 
 import (
-	"log"
 	"bufio"
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
-	"os"
-	"crypto/x509"
-	"crypto/tls"
 
 	"github.com/tinylib/msgp/msgp"
 
@@ -59,7 +59,7 @@ type listenOptions struct {
 	MsgpackToJSON bool
 
 	TLSCert string
-	TLSKey string
+	TLSKey  string
 }
 
 var listenOptionHelp = ndog.OptionsHelp{}.
@@ -131,7 +131,7 @@ func Listen(cfg ndog.ListenConfig) error {
 
 	s := &http.Server{
 		ErrorLog: log.New(errLogWriter, "", 0),
-		Addr: cfg.URL.Host,
+		Addr:     cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ndog.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
 			if r.Host != cfg.URL.Host {
