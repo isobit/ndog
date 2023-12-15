@@ -38,7 +38,12 @@ func Listen(cfg ndog.ListenConfig) error {
 
 	streams := map[string]ndog.Stream{}
 
-	buf := make([]byte, 1024)
+	// ReadFromUDP dequeues an entire packet from the socket each time it's
+	// called, so the buffer needs to have enough space to read entire packets
+	// at once. 65535 bytes is the maximum possible packet size; ndog doesn't
+	// know anything about the expected inner protocol, so best to use this
+	// maximum size as the buffer size.
+	buf := make([]byte, 65535)
 	for {
 		nr, remoteAddr, err := conn.ReadFromUDP(buf)
 		if err != nil {
@@ -48,6 +53,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			return err
 		}
 		remoteAddrStr := remoteAddr.String()
+		ndog.Logf(10, "%d bytes from %s", nr, remoteAddrStr)
 
 		var stream ndog.Stream
 		if existingStream, ok := streams[remoteAddrStr]; ok {
