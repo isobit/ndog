@@ -4,20 +4,18 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/tinylib/msgp/msgp"
 
 	"github.com/isobit/ndog/internal"
+	ndog_tls "github.com/isobit/ndog/internal/tls"
 )
 
 var HTTPScheme = &ndog.Scheme{
@@ -151,7 +149,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			// Receive request.
 			contentType := r.Header.Get("Content-Type")
 			if opts.MsgpackToJSON && (contentType == "application/msgpack" || contentType == "application/x-msgpack") {
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					ndog.Logf(-1, "error reading request body: %s", err)
 					return
@@ -183,17 +181,33 @@ func Listen(cfg ndog.ListenConfig) error {
 			ndog.Logf(10, "handler closed")
 		}),
 	}
-	ndog.Logf(0, "listening: %s", s.Addr)
 	if cfg.URL.Scheme == "https" {
+		if opts.TLSCert == "" && opts.TLSKey == "" {
+			ndog.Logf(0, "TLS cert and key options not set; generating self-signed cert")
+			ca, err := ndog_tls.GenerateCA()
+			if err != nil {
+				return err
+			}
+			cert, err := ca.GenerateAndSignTLSCert()
+			if err != nil {
+				return err
+			}
+			s.TLSConfig = &tls.Config{
+				Certificates: []tls.Certificate{cert},
+			}
+		}
+		ndog.Logf(0, "listening: %s", s.Addr)
 		return s.ListenAndServeTLS(opts.TLSCert, opts.TLSKey)
 	}
+	ndog.Logf(0, "listening: %s", s.Addr)
 	return s.ListenAndServe()
 }
 
 type connectOptions struct {
 	Method  string
 	Headers map[string]string
-	CACert  string
+	TLSCACert  string
+	TLSInsecure bool
 	GraphQL bool
 }
 
@@ -232,7 +246,11 @@ func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions,
 	}
 
 	if val, ok := opts.Pop("cacert"); ok {
-		o.CACert = val
+		o.TLSCACert = val
+	}
+
+	if _, ok := opts.Pop("insecure"); ok {
+		o.TLSInsecure = true
 	}
 
 	return o, opts.Done()
@@ -277,21 +295,26 @@ func Connect(cfg ndog.ConnectConfig) error {
 		httpReq.Header.Add(key, val)
 	}
 
-	client := &http.Client{}
-	if opts.CACert != "" {
-		cert, err := os.ReadFile(opts.CACert)
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{},
+	}
+	client := &http.Client{
+		Transport: transport,
+	}
+	if opts.TLSCACert != "" {
+		certPool, err := ndog_tls.CertPoolFromCACert(opts.TLSCACert)
 		if err != nil {
-			return fmt.Errorf("error reading CA cert %s: %w", opts.CACert, err)
+			return err
 		}
-		certPool := x509.NewCertPool()
-		if ok := certPool.AppendCertsFromPEM(cert); !ok {
-			return fmt.Errorf("unable to parse CA cert %s", opts.CACert)
-		}
-		client.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs: certPool,
-			},
-		}
+		transport.TLSClientConfig.RootCAs = certPool
+		// client.Transport = &http.Transport{
+		// 	TLSClientConfig: &tls.Config{
+		// 		RootCAs: certPool,
+		// 	},
+		// }
+	}
+	if opts.TLSInsecure {
+		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	// Do request
