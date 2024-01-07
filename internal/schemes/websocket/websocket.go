@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"bufio"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -13,10 +14,11 @@ import (
 	"github.com/sourcegraph/conc"
 
 	"github.com/isobit/ndog/internal"
+	ndog_tls "github.com/isobit/ndog/internal/tls"
 )
 
 var WSScheme = &ndog.Scheme{
-	Names:   []string{"ws"},
+	Names:   []string{"ws", "wss"},
 	Listen:  Listen,
 	Connect: Connect,
 
@@ -32,25 +34,16 @@ Examples:
 	ConnectOptionHelp: connectOptionHelp,
 }
 
-var WSSScheme = &ndog.Scheme{
-	Names:   []string{"wss"},
-	Connect: Connect,
-
-	Description: `
-Connect opens a WebSocket connection to the specified URL.
-	`,
-	ConnectOptionHelp: connectOptionHelp,
-}
-
 type ListenOptions struct {
 	MessageType int
+	ndog_tls.TLSCAListenOptions
 }
 
 var listenOptionHelp = ndog.OptionsHelp{}.
 	Add("text", "", "Send using text data frames instead of binary")
 
-func extractListenOptions(opts ndog.Options) (ConnectOptions, error) {
-	o := ConnectOptions{
+func extractListenOptions(opts ndog.Options) (ListenOptions, error) {
+	o := ListenOptions{
 		MessageType: websocket.BinaryMessage,
 	}
 
@@ -58,13 +51,15 @@ func extractListenOptions(opts ndog.Options) (ConnectOptions, error) {
 		o.MessageType = websocket.TextMessage
 	}
 
+	generateTLSCertOptions, err := ndog_tls.ExtractTLSCAListenOptions(opts)
+	if err != nil {
+		return o, err
+	}
+	o.TLSCAListenOptions = generateTLSCertOptions
+
 	return o, opts.Done()
 }
 func Listen(cfg ndog.ListenConfig) error {
-	if cfg.URL.Scheme == "wss" {
-		return fmt.Errorf("listen does not support secure websockets yet")
-	}
-
 	opts, err := extractListenOptions(cfg.Options)
 	if err != nil {
 		return err
@@ -97,6 +92,16 @@ func Listen(cfg ndog.ListenConfig) error {
 
 			bidirectionalCopy(conn, stream, opts.MessageType)
 		}),
+	}
+	if cfg.URL.Scheme == "wss" {
+		ndog.Logf(0, "generating TLS cert")
+		cert, err := opts.TLSCAListenOptions.Certificate([]string{cfg.URL.Hostname()})
+		if err != nil {
+			return fmt.Errorf("error generating and signing cert: %w", err)
+		}
+		s.TLSConfig = &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		}
 	}
 	ndog.Logf(0, "listening: %s", s.Addr)
 	return s.ListenAndServe()

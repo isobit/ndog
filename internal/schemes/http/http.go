@@ -58,6 +58,7 @@ type listenOptions struct {
 
 	TLSCert string
 	TLSKey  string
+	ndog_tls.TLSCAListenOptions
 }
 
 var listenOptionHelp = ndog.OptionsHelp{}.
@@ -105,6 +106,12 @@ func extractListenOptions(opts ndog.Options) (listenOptions, error) {
 	if val, ok := opts.Pop("key"); ok {
 		o.TLSKey = val
 	}
+
+	generateTLSCertOptions, err := ndog_tls.ExtractTLSCAListenOptions(opts)
+	if err != nil {
+		return o, err
+	}
+	o.TLSCAListenOptions = generateTLSCertOptions
 
 	return o, opts.Done()
 }
@@ -183,14 +190,10 @@ func Listen(cfg ndog.ListenConfig) error {
 	}
 	if cfg.URL.Scheme == "https" {
 		if opts.TLSCert == "" && opts.TLSKey == "" {
-			ndog.Logf(0, "TLS cert and key options not set; generating self-signed cert")
-			ca, err := ndog_tls.GenerateCA()
+			ndog.Logf(0, "TLS cert and key options not set; generating cert")
+			cert, err := opts.TLSCAListenOptions.Certificate([]string{cfg.URL.Hostname()})
 			if err != nil {
-				return err
-			}
-			cert, err := ca.GenerateAndSignTLSCert()
-			if err != nil {
-				return err
+				return fmt.Errorf("error generating and signing cert: %w", err)
 			}
 			s.TLSConfig = &tls.Config{
 				Certificates: []tls.Certificate{cert},
@@ -307,11 +310,6 @@ func Connect(cfg ndog.ConnectConfig) error {
 			return err
 		}
 		transport.TLSClientConfig.RootCAs = certPool
-		// client.Transport = &http.Transport{
-		// 	TLSClientConfig: &tls.Config{
-		// 		RootCAs: certPool,
-		// 	},
-		// }
 	}
 	if opts.TLSInsecure {
 		transport.TLSClientConfig.InsecureSkipVerify = true

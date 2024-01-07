@@ -23,7 +23,6 @@ func init() {
 		tcp.Scheme,
 		udp.Scheme,
 		websocket.WSScheme,
-		websocket.WSSScheme,
 	)
 }
 
