@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/jackc/pgx/v5/pgproto3"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/isobit/ndog/internal"
 )
@@ -66,6 +67,7 @@ func handleConn(cfg ndog.ListenConfig, conn net.Conn) error {
 			return fmt.Errorf("receive error: %w", err)
 		}
 		switch msg := msg.(type) {
+
 		case *pgproto3.Query:
 			ndog.Logf(3, "got query message: %s", msg.String)
 
@@ -82,7 +84,7 @@ func handleConn(cfg ndog.ListenConfig, conn net.Conn) error {
 					Name:                 []byte("ndog"),
 					TableOID:             0,
 					TableAttributeNumber: 0,
-					DataTypeOID:          25,
+					DataTypeOID:          pgtype.TextOID,
 					DataTypeSize:         -1,
 					TypeModifier:         -1,
 					Format:               0,
@@ -101,11 +103,14 @@ func handleConn(cfg ndog.ListenConfig, conn net.Conn) error {
 			if err := backend.Flush(); err != nil {
 				return fmt.Errorf("error sending response to query: %w", err)
 			}
+
 		case *pgproto3.Terminate:
 			ndog.Logf(3, "got terminate message: %+v", msg)
 			return nil
+
 		default:
 			return fmt.Errorf("got unknown message: %v", msg)
+
 		}
 	}
 }
