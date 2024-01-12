@@ -13,6 +13,10 @@ import (
 )
 
 func Listen(cfg ndog.ListenConfig) error {
+	if err := cfg.Options.Done(); err != nil {
+		return err
+	}
+
 	addr, err := net.ResolveTCPAddr("tcp", cfg.URL.Host)
 	if err != nil {
 		return fmt.Errorf("invalid address: %w", err)
