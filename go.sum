@@ -14,6 +14,8 @@ github.com/huandu/xstrings v1.4.0 h1:D17IlohoQq4UcpqD7fDk80P7l+lwAmlFaBHgOipl2FU
 github.com/huandu/xstrings v1.4.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/isobit/cli v0.11.0 h1:TZjfwrJQY+Cg/MZZmF+0nH+smDA8ezr1IwASZZz09Xs=
 github.com/isobit/cli v0.11.0/go.mod h1:QkUO7+do7z+APu7K6CyeUi3qlewleqcgQkM6evYKbFc=
+github.com/isobit/cli v0.11.1-0.20240207065020-f91febcb7277 h1:lVZQUJRYjA9D7w1ZJwnBmqN2vmUpcpnyVFutJCIH6yM=
+github.com/isobit/cli v0.11.1-0.20240207065020-f91febcb7277/go.mod h1:QkUO7+do7z+APu7K6CyeUi3qlewleqcgQkM6evYKbFc=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
 github.com/jackc/pgpassfile v1.0.0/go.mod h1:CEx0iS5ambNFdcRtxPj5JhEz+xB6uRky5eyVu/W2HEg=
 github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a h1:bbPeKD0xmW/Y25WS6cokEszi5g+S0QxI/d45PkRi7Nk=
