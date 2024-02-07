@@ -15,7 +15,6 @@ import (
 	"math/big"
 	"net"
 	"os"
-	// "strings"
 	"time"
 
 	"github.com/isobit/ndog/internal/log"
@@ -188,46 +187,3 @@ func (ca *CA) GenerateAndSignTLSCert(hosts []string) (tls.Certificate, error) {
 
 	return tls.X509KeyPair(certPEM.Bytes(), certPrivKeyPEM.Bytes())
 }
-
-// type TLSCAListenOptions struct {
-// 	TLSCACert string
-// 	TLSCAKey  string
-// 	TLSHosts []string
-// }
-
-// func ExtractTLSCAListenOptions(opts ndog.Options) (TLSCAListenOptions, error) {
-// 	o := TLSCAListenOptions{
-// 		TLSHosts: []string{},
-// 	}
-// 	if val, ok := opts.Pop("tlscacert"); ok {
-// 		o.TLSCACert = val
-// 	}
-// 	if val, ok := opts.Pop("tlscakey"); ok {
-// 		o.TLSCAKey = val
-// 	}
-// 	if val, ok := opts.Pop("tlshosts"); ok {
-// 		o.TLSHosts = strings.Split(val, ",")
-// 	}
-// 	return o, nil
-// }
-
-// func (opts TLSCAListenOptions) CA() (*CA, error) {
-// 	if opts.TLSCACert != "" && opts.TLSCAKey != "" {
-// 		log.Logf(1, "loading CA from cert in %s and key in %s", opts.TLSCACert, opts.TLSCAKey)
-// 		return LoadCAFromFiles(opts.TLSCACert, opts.TLSCAKey)
-// 	}
-// 	log.Logf(1, "generating self-signed CA cert")
-// 	return GenerateCA()
-// }
-
-// func (opts TLSCAListenOptions) Certificate(extraHosts []string) (tls.Certificate, error) {
-// 	ca, err := opts.CA()
-// 	if err != nil {
-// 		return tls.Certificate{}, fmt.Errorf("error obtaining CA: %w", err)
-// 	}
-// 	cert, err := ca.GenerateAndSignTLSCert(append(opts.TLSHosts, extraHosts...))
-// 	if err != nil {
-// 		return tls.Certificate{}, fmt.Errorf("error generating and signing cert: %w", err)
-// 	}
-// 	return cert, nil
-// }

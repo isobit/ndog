@@ -15,7 +15,6 @@ type Options struct {
 	TLSCert string `cli:"name=tls-cert,env=NDOG_TLS_CERT"`
 	TLSKey  string `cli:"name=tls-key,env=NDOG_TLS_KEY"`
 
-	// Certificate generation
 	TLSCACert     string   `cli:"name=tls-ca-cert,env=NDOG_TLS_CA_CERT"`
 	TLSCAKey      string   `cli:"name=tls-ca-key,env=NDOG_TLS_CA_KEY"`
 	TLSExtraHosts []string `cli:"name=tls-extra-hosts,env=NDOG_TLS_CA_EXTRA_HOSTS,append"`
@@ -84,61 +83,3 @@ func (opts Options) getCA() (*CA, error) {
 	log.Logf(1, "generating self-signed TLS CA cert")
 	return GenerateCA()
 }
-
-// func CertPoolFromCACert(filename string) (*x509.CertPool, error) {
-// 	certPool, err := x509.SystemCertPool()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error loading system cert pool: %w", err)
-// 	}
-
-// 	cert, err := os.ReadFile(filename)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error reading CA cert %s: %w", filename, err)
-// 	}
-// 	if ok := certPool.AppendCertsFromPEM(cert); !ok {
-// 		return nil, fmt.Errorf("unable to parse CA cert %s", filename)
-// 	}
-
-// 	return certPool, nil
-// }
-
-// type TLSOptions struct {
-// 	TLSCACert string
-// 	TLSCAKey  string
-// 	TLSCACertHosts []string
-// }
-
-// func ExtractTLSOptions(opts ndog.Options) (TLSOptions, error) {
-// 	o := TLSOptions{}
-// 	if val, ok := opts.Pop("tlscacert"); ok {
-// 		o.TLSCACert = val
-// 	}
-// 	if val, ok := opts.Pop("tlscakey"); ok {
-// 		o.TLSCAKey = val
-// 	}
-// 	if val, ok := opts.Pop("tlscacerthosts"); ok {
-// 		o.TLSCACertHosts = strings.Split(val, ",")
-// 	}
-// 	return o, nil
-// }
-
-// func (opts TLSOptions) CA() (*CA, error) {
-// 	if opts.TLSCACert != "" && opts.TLSCAKey != "" {
-// 		log.Logf(1, "loading CA from cert in %s and key in %s", opts.TLSCACert, opts.TLSCAKey)
-// 		return LoadCAFromFiles(opts.TLSCACert, opts.TLSCAKey)
-// 	}
-// 	log.Logf(1, "generating self-signed CA cert")
-// 	return GenerateCA()
-// }
-
-// func (opts TLSOptions) Certificate(extraHosts []string) (tls.Certificate, error) {
-// 	ca, err := opts.CA()
-// 	if err != nil {
-// 		return tls.Certificate{}, fmt.Errorf("error obtaining CA: %w", err)
-// 	}
-// 	cert, err := ca.GenerateAndSignTLSCert(append(opts.TLSCACertHosts, extraHosts...))
-// 	if err != nil {
-// 		return tls.Certificate{}, fmt.Errorf("error generating and signing cert: %w", err)
-// 	}
-// 	return cert, nil
-// }
