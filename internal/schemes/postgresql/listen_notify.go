@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/log"
 )
 
 var ListenScheme = &ndog.Scheme{
@@ -50,12 +51,12 @@ func listenConnect(cfg ndog.ConnectConfig) error {
 
 	cc := conn.Config()
 	name := fmt.Sprintf("%s:%d", cc.Host, cc.Port)
-	ndog.Logf(0, "connected: %s", name)
+	log.Logf(0, "connected: %s", name)
 
 	stream := cfg.Stream
 
 	for _, channelName := range channelNames {
-		ndog.Logf(1, "exec: LISTEN %s", channelName)
+		log.Logf(1, "exec: LISTEN %s", channelName)
 		if _, err := conn.Exec(ctx, fmt.Sprintf("LISTEN %s", channelName)); err != nil {
 			return err
 		}
@@ -66,7 +67,7 @@ func listenConnect(cfg ndog.ConnectConfig) error {
 		if err != nil {
 			return err
 		}
-		ndog.Logf(1, "notification: %s", notification.Channel)
+		log.Logf(1, "notification: %s", notification.Channel)
 		if opts.JSON {
 			data, err := json.Marshal(notification)
 			if err != nil {
@@ -118,12 +119,12 @@ func notifyConnect(cfg ndog.ConnectConfig) error {
 
 	cc := conn.Config()
 	name := fmt.Sprintf("%s:%d", cc.Host, cc.Port)
-	ndog.Logf(0, "connected: %s", name)
+	log.Logf(0, "connected: %s", name)
 
 	scanner := bufio.NewScanner(cfg.Stream.Reader)
 	for scanner.Scan() {
 		payload := scanner.Text()
-		ndog.Logf(1, "notify: %s", channelName)
+		log.Logf(1, "notify: %s", channelName)
 		if _, err := conn.Exec(ctx, "SELECT pg_notify($1, $2)", channelName, payload); err != nil {
 			return err
 		}

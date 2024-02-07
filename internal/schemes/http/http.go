@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	stdlog "log"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -122,7 +122,7 @@ func Listen(cfg ndog.ListenConfig) error {
 		return err
 	}
 	if opts.ServeFile != "" {
-		ndog.Logf(1, "http: will serve file(s) from %s", opts.ServeFile)
+		log.Logf(1, "http: will serve file(s) from %s", opts.ServeFile)
 	}
 
 	errLogReader, errLogWriter := io.Pipe()
@@ -130,20 +130,20 @@ func Listen(cfg ndog.ListenConfig) error {
 	go func() {
 		s := bufio.NewScanner(errLogReader)
 		for s.Scan() {
-			ndog.Logf(-1, s.Text())
+			log.Logf(-1, s.Text())
 		}
 	}()
 
 	s := &http.Server{
-		ErrorLog: log.New(errLogWriter, "", 0),
+		ErrorLog: stdlog.New(errLogWriter, "", 0),
 		Addr:     cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ndog.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
+			log.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
 			if r.Host != cfg.URL.Host {
-				ndog.Logf(1, "request header: Host: %s", r.Host)
+				log.Logf(1, "request header: Host: %s", r.Host)
 			}
 			for key, values := range r.Header {
-				ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
+				log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
 			if opts.ServeFile != "" {
 				http.ServeFile(w, r, filepath.Join(opts.ServeFile, r.URL.Path))
@@ -158,17 +158,17 @@ func Listen(cfg ndog.ListenConfig) error {
 			if opts.MsgpackToJSON && (contentType == "application/msgpack" || contentType == "application/x-msgpack") {
 				body, err := io.ReadAll(r.Body)
 				if err != nil {
-					ndog.Logf(-1, "error reading request body: %s", err)
+					log.Logf(-1, "error reading request body: %s", err)
 					return
 				}
 				if _, err := msgp.UnmarshalAsJSON(stream.Writer, body); err != nil {
-					ndog.Logf(-1, "error unmarshaling request body msgpack as JSON: %s", err)
+					log.Logf(-1, "error unmarshaling request body msgpack as JSON: %s", err)
 					return
 				}
 				stream.Writer.Write([]byte{'\n'})
 			} else {
 				if _, err := io.Copy(stream.Writer, r.Body); err != nil {
-					ndog.Logf(-1, "error reading request body: %s", err)
+					log.Logf(-1, "error reading request body: %s", err)
 					return
 				}
 				stream.Writer.Write([]byte{'\n'})
@@ -179,13 +179,13 @@ func Listen(cfg ndog.ListenConfig) error {
 			for key, val := range opts.Headers {
 				w.Header().Add(key, val)
 			}
-			ndog.Logf(10, "writing status code %d", opts.StatusCode)
+			log.Logf(10, "writing status code %d", opts.StatusCode)
 			w.WriteHeader(opts.StatusCode)
 			if _, err := io.Copy(w, stream.Reader); err != nil {
-				ndog.Logf(-1, "error writing response body: %s", err)
+				log.Logf(-1, "error writing response body: %s", err)
 				return
 			}
-			ndog.Logf(10, "handler closed")
+			log.Logf(10, "handler closed")
 		}),
 	}
 	if cfg.URL.Scheme == "https" {
@@ -199,10 +199,10 @@ func Listen(cfg ndog.ListenConfig) error {
 				Certificates: []tls.Certificate{cert},
 			}
 		}
-		ndog.Logf(0, "listening: %s", s.Addr)
-		return s.ListenAndServeTLS(opts.TLSCert, opts.TLSKey)
+		log.Logf(0, "listening: %s", s.Addr)
+		return s.ListenAndServeTLS("", "")
 	}
-	ndog.Logf(0, "listening: %s", s.Addr)
+	log.Logf(0, "listening: %s", s.Addr)
 	return s.ListenAndServe()
 }
 
@@ -292,7 +292,7 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 	for key, val := range opts.Headers {
 		if strings.EqualFold(key, "host") {
-			ndog.Logf(2, "setting host: %s", val)
+			log.Logf(2, "setting host: %s", val)
 			httpReq.Host = val
 		}
 		httpReq.Header.Add(key, val)
@@ -316,18 +316,18 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	// Do request
-	ndog.Logf(0, "request: %s %s", opts.Method, reqUrl.RequestURI())
+	log.Logf(0, "request: %s %s", opts.Method, reqUrl.RequestURI())
 	for key, values := range httpReq.Header {
-		ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
+		log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 	}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return err
 	}
 
-	ndog.Logf(0, "response: %s", resp.Status)
+	log.Logf(0, "response: %s", resp.Status)
 	for key, values := range resp.Header {
-		ndog.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
+		log.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
 	}
 
 	if opts.GraphQL {

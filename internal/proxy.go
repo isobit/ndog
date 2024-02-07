@@ -2,6 +2,8 @@ package ndog
 
 import (
 	"io"
+
+	"github.com/isobit/ndog/internal/log"
 )
 
 type ProxyStreamManager struct {
@@ -10,7 +12,7 @@ type ProxyStreamManager struct {
 }
 
 func (f ProxyStreamManager) NewStream(name string) Stream {
-	Logf(10, "creating proxy pipe: %s", name)
+	log.Logf(10, "creating proxy pipe: %s", name)
 
 	listenReader, listenWriter := io.Pipe()
 	connectReader, connectWriter := io.Pipe()
@@ -41,7 +43,7 @@ func (f ProxyStreamManager) NewStream(name string) Stream {
 			Stream: connectStream,
 		}
 		if err := f.Connect(cfg); err != nil {
-			Logf(-1, "connect error: %s", err)
+			log.Logf(-1, "connect error: %s", err)
 		}
 	}()
 

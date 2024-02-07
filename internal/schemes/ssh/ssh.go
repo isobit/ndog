@@ -7,6 +7,7 @@ import (
 	"github.com/gliderlabs/ssh"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/log"
 )
 
 var Scheme = &ndog.Scheme{
@@ -21,7 +22,7 @@ Listen starts an SSH server on the host and port specified in the URL.
 func Listen(cfg ndog.ListenConfig) error {
 	handler := func(s ssh.Session) {
 		name := fmt.Sprintf("%s@%s", s.User(), s.RemoteAddr())
-		ndog.Logf(1, "accepted: %s %s", name, s.RawCommand())
+		log.Logf(1, "accepted: %s %s", name, s.RawCommand())
 		stream := cfg.StreamManager.NewStream(name)
 		go io.Copy(stream.Writer, s)
 		io.Copy(s, stream.Reader)
@@ -35,6 +36,6 @@ func Listen(cfg ndog.ListenConfig) error {
 			return false
 		},
 	}
-	ndog.Logf(0, "listening: %s", cfg.URL.Host)
+	log.Logf(0, "listening: %s", cfg.URL.Host)
 	return server.ListenAndServe()
 }
