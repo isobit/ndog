@@ -2,9 +2,7 @@ package websocket
 
 import (
 	"bufio"
-	"crypto/tls"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -14,7 +12,6 @@ import (
 	"github.com/sourcegraph/conc"
 
 	"github.com/isobit/ndog/internal"
-	ndog_tls "github.com/isobit/ndog/internal/tls"
 	"github.com/isobit/ndog/internal/log"
 )
 
@@ -37,7 +34,6 @@ Examples:
 
 type ListenOptions struct {
 	MessageType int
-	ndog_tls.TLSCAListenOptions
 }
 
 var listenOptionHelp = ndog.OptionsHelp{}.
@@ -51,12 +47,6 @@ func extractListenOptions(opts ndog.Options) (ListenOptions, error) {
 	if _, ok := opts.Pop("text"); ok {
 		o.MessageType = websocket.TextMessage
 	}
-
-	generateTLSCertOptions, err := ndog_tls.ExtractTLSCAListenOptions(opts)
-	if err != nil {
-		return o, err
-	}
-	o.TLSCAListenOptions = generateTLSCertOptions
 
 	return o, opts.Done()
 }
@@ -95,13 +85,13 @@ func Listen(cfg ndog.ListenConfig) error {
 		}),
 	}
 	if cfg.URL.Scheme == "wss" {
-		cert, err := opts.TLSCAListenOptions.Certificate([]string{cfg.URL.Hostname()})
+		tlsConfig, err := cfg.TLS.Config(false, nil)
 		if err != nil {
-			return fmt.Errorf("error generating and signing cert: %w", err)
+			return err
 		}
-		s.TLSConfig = &tls.Config{
-			Certificates: []tls.Certificate{cert},
-		}
+		s.TLSConfig = tlsConfig
+		log.Logf(0, "listening: %s", s.Addr)
+		return s.ListenAndServeTLS("", "")
 	}
 	log.Logf(0, "listening: %s", s.Addr)
 	return s.ListenAndServe()
@@ -163,8 +153,14 @@ func Connect(cfg ndog.ConnectConfig) error {
 		header.Add(key, val)
 	}
 
+	tlsConfig, err := cfg.TLS.Config(false, nil)
+	if err != nil {
+		return err
+	}
+
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
+		TLSClientConfig:  tlsConfig,
 	}
 	if opts.Protocol != "" {
 		dialer.Subprotocols = []string{opts.Protocol}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	ndog_tls "github.com/isobit/ndog/internal/tls"
 )
 
 type Scheme struct {
@@ -20,6 +22,7 @@ type Scheme struct {
 type Config struct {
 	URL     *url.URL
 	Options Options
+	TLS     ndog_tls.Options
 }
 
 type ListenConfig struct {

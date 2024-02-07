@@ -3,7 +3,6 @@ package http
 import (
 	"bufio"
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,7 +14,7 @@ import (
 	"github.com/tinylib/msgp/msgp"
 
 	"github.com/isobit/ndog/internal"
-	ndog_tls "github.com/isobit/ndog/internal/tls"
+	"github.com/isobit/ndog/internal/log"
 )
 
 var HTTPScheme = &ndog.Scheme{
@@ -55,10 +54,6 @@ type listenOptions struct {
 	Headers       map[string]string
 	ServeFile     string
 	MsgpackToJSON bool
-
-	TLSCert string
-	TLSKey  string
-	ndog_tls.TLSCAListenOptions
 }
 
 var listenOptionHelp = ndog.OptionsHelp{}.
@@ -99,19 +94,6 @@ func extractListenOptions(opts ndog.Options) (listenOptions, error) {
 		o.Headers[headerKey] = val
 		delete(opts, key)
 	}
-
-	if val, ok := opts.Pop("cert"); ok {
-		o.TLSCert = val
-	}
-	if val, ok := opts.Pop("key"); ok {
-		o.TLSKey = val
-	}
-
-	generateTLSCertOptions, err := ndog_tls.ExtractTLSCAListenOptions(opts)
-	if err != nil {
-		return o, err
-	}
-	o.TLSCAListenOptions = generateTLSCertOptions
 
 	return o, opts.Done()
 }
@@ -189,16 +171,11 @@ func Listen(cfg ndog.ListenConfig) error {
 		}),
 	}
 	if cfg.URL.Scheme == "https" {
-		if opts.TLSCert == "" && opts.TLSKey == "" {
-			ndog.Logf(0, "TLS cert and key options not set; generating cert")
-			cert, err := opts.TLSCAListenOptions.Certificate([]string{cfg.URL.Hostname()})
-			if err != nil {
-				return fmt.Errorf("error generating and signing cert: %w", err)
-			}
-			s.TLSConfig = &tls.Config{
-				Certificates: []tls.Certificate{cert},
-			}
+		tlsConfig, err := cfg.TLS.Config(true, []string{cfg.URL.Hostname()})
+		if err != nil {
+			return err
 		}
+		s.TLSConfig = tlsConfig
 		log.Logf(0, "listening: %s", s.Addr)
 		return s.ListenAndServeTLS("", "")
 	}
@@ -209,8 +186,6 @@ func Listen(cfg ndog.ListenConfig) error {
 type connectOptions struct {
 	Method  string
 	Headers map[string]string
-	TLSCACert  string
-	TLSInsecure bool
 	GraphQL bool
 }
 
@@ -246,14 +221,6 @@ func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions,
 		headerKey := strings.TrimPrefix(key, headerKeyPrefix)
 		o.Headers[headerKey] = val
 		delete(opts, key)
-	}
-
-	if val, ok := opts.Pop("cacert"); ok {
-		o.TLSCACert = val
-	}
-
-	if _, ok := opts.Pop("insecure"); ok {
-		o.TLSInsecure = true
 	}
 
 	return o, opts.Done()
@@ -298,21 +265,16 @@ func Connect(cfg ndog.ConnectConfig) error {
 		httpReq.Header.Add(key, val)
 	}
 
+	tlsConfig, err := cfg.TLS.Config(false, nil)
+	if err != nil {
+		return err
+	}
+
 	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{},
+		TLSClientConfig: tlsConfig,
 	}
 	client := &http.Client{
 		Transport: transport,
-	}
-	if opts.TLSCACert != "" {
-		certPool, err := ndog_tls.CertPoolFromCACert(opts.TLSCACert)
-		if err != nil {
-			return err
-		}
-		transport.TLSClientConfig.RootCAs = certPool
-	}
-	if opts.TLSInsecure {
-		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
 	// Do request

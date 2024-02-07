@@ -15,15 +15,15 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"strings"
+	// "strings"
 	"time"
 
-	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/log"
 )
 
 type CA struct {
 	cert *x509.Certificate
-	key crypto.Signer
+	key  crypto.Signer
 }
 
 func LoadCAFromFiles(certFilename string, keyFilename string) (*CA, error) {
@@ -53,7 +53,7 @@ func LoadCAFromFiles(certFilename string, keyFilename string) (*CA, error) {
 
 	return &CA{
 		cert: cert,
-		key: key.(crypto.Signer),
+		key:  key.(crypto.Signer),
 	}, nil
 }
 
@@ -70,11 +70,11 @@ func GenerateCA() (*CA, error) {
 			PostalCode:    []string{""},
 		},
 
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(10, 0, 0),
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().AddDate(10, 0, 0),
 
-		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 
 		IsCA:                  true,
 		BasicConstraintsValid: true,
@@ -85,7 +85,7 @@ func GenerateCA() (*CA, error) {
 	}
 	return &CA{
 		cert: cert,
-		key: key,
+		key:  key,
 	}, nil
 }
 
@@ -115,7 +115,7 @@ func hostsToIPAndDNS(hosts []string) ([]net.IP, []string) {
 				if err == nil {
 					ips = append(ips, addr.IP)
 				} else {
-					ndog.Logf(10, "failed to resolve %s: %s", host, err)
+					log.Logf(10, "failed to resolve %s: %s", host, err)
 				}
 			}
 		}
@@ -138,16 +138,16 @@ func (ca *CA) GenerateAndSignTLSCert(hosts []string) (tls.Certificate, error) {
 		// 	PostalCode:    []string{""},
 		// },
 
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(10, 0, 0),
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().AddDate(10, 0, 0),
 
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 
 		// SubjectKeyId: []byte{1, 2, 3, 4, 6},
-		
+
 		IPAddresses: ips,
-		DNSNames: dnsNames,
+		DNSNames:    dnsNames,
 
 		// DNSNames: []string{
 		// 	"localhost",
@@ -158,7 +158,7 @@ func (ca *CA) GenerateAndSignTLSCert(hosts []string) (tls.Certificate, error) {
 		// },
 	}
 
-	ndog.Logf(10, "TLS cert template: %+v", cert)
+	log.Logf(10, "TLS cert template: %+v", cert)
 
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -189,45 +189,45 @@ func (ca *CA) GenerateAndSignTLSCert(hosts []string) (tls.Certificate, error) {
 	return tls.X509KeyPair(certPEM.Bytes(), certPrivKeyPEM.Bytes())
 }
 
-type TLSCAListenOptions struct {
-	TLSCACert string
-	TLSCAKey  string
-	TLSHosts []string
-}
+// type TLSCAListenOptions struct {
+// 	TLSCACert string
+// 	TLSCAKey  string
+// 	TLSHosts []string
+// }
 
-func ExtractTLSCAListenOptions(opts ndog.Options) (TLSCAListenOptions, error) {
-	o := TLSCAListenOptions{
-		TLSHosts: []string{},
-	}
-	if val, ok := opts.Pop("tlscacert"); ok {
-		o.TLSCACert = val
-	}
-	if val, ok := opts.Pop("tlscakey"); ok {
-		o.TLSCAKey = val
-	}
-	if val, ok := opts.Pop("tlshosts"); ok {
-		o.TLSHosts = strings.Split(val, ",")
-	}
-	return o, nil
-}
+// func ExtractTLSCAListenOptions(opts ndog.Options) (TLSCAListenOptions, error) {
+// 	o := TLSCAListenOptions{
+// 		TLSHosts: []string{},
+// 	}
+// 	if val, ok := opts.Pop("tlscacert"); ok {
+// 		o.TLSCACert = val
+// 	}
+// 	if val, ok := opts.Pop("tlscakey"); ok {
+// 		o.TLSCAKey = val
+// 	}
+// 	if val, ok := opts.Pop("tlshosts"); ok {
+// 		o.TLSHosts = strings.Split(val, ",")
+// 	}
+// 	return o, nil
+// }
 
-func (opts TLSCAListenOptions) CA() (*CA, error) {
-	if opts.TLSCACert != "" && opts.TLSCAKey != "" {
-		ndog.Logf(1, "loading CA from cert in %s and key in %s", opts.TLSCACert, opts.TLSCAKey)
-		return LoadCAFromFiles(opts.TLSCACert, opts.TLSCAKey)
-	}
-	ndog.Logf(1, "generating self-signed CA cert")
-	return GenerateCA()
-}
+// func (opts TLSCAListenOptions) CA() (*CA, error) {
+// 	if opts.TLSCACert != "" && opts.TLSCAKey != "" {
+// 		log.Logf(1, "loading CA from cert in %s and key in %s", opts.TLSCACert, opts.TLSCAKey)
+// 		return LoadCAFromFiles(opts.TLSCACert, opts.TLSCAKey)
+// 	}
+// 	log.Logf(1, "generating self-signed CA cert")
+// 	return GenerateCA()
+// }
 
-func (opts TLSCAListenOptions) Certificate(extraHosts []string) (tls.Certificate, error) {
-	ca, err := opts.CA()
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("error obtaining CA: %w", err)
-	}
-	cert, err := ca.GenerateAndSignTLSCert(append(opts.TLSHosts, extraHosts...))
-	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("error generating and signing cert: %w", err)
-	}
-	return cert, nil
-}
+// func (opts TLSCAListenOptions) Certificate(extraHosts []string) (tls.Certificate, error) {
+// 	ca, err := opts.CA()
+// 	if err != nil {
+// 		return tls.Certificate{}, fmt.Errorf("error obtaining CA: %w", err)
+// 	}
+// 	cert, err := ca.GenerateAndSignTLSCert(append(opts.TLSHosts, extraHosts...))
+// 	if err != nil {
+// 		return tls.Certificate{}, fmt.Errorf("error generating and signing cert: %w", err)
+// 	}
+// 	return cert, nil
+// }
