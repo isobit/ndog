@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"syscall"
 	"time"
+
+	"github.com/isobit/ndog/internal/log"
 )
 
 type ExecStreamManager struct {
@@ -38,18 +40,18 @@ func (f *ExecStreamManager) NewStream(name string) Stream {
 		panic(err)
 	}
 
-	Logf(10, "exec: starting: %s", cmd)
+	log.Logf(10, "exec: starting: %s", cmd)
 	if err := cmd.Start(); err != nil {
 		panic(err)
 	}
-	Logf(10, "exec: started: %d", cmd.Process.Pid)
+	log.Logf(10, "exec: started: %d", cmd.Process.Pid)
 
 	// Log stderr
 	go func() {
 		defer stderr.Close()
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			Logf(0, "exec: stderr: %d: %s", cmd.Process.Pid, scanner.Text())
+			log.Logf(0, "exec: stderr: %d: %s", cmd.Process.Pid, scanner.Text())
 		}
 	}()
 
@@ -73,7 +75,7 @@ func (f *ExecStreamManager) NewStream(name string) Stream {
 		go func() {
 			select {
 			case <-time.After(10 * time.Second):
-				Logf(10, "exec: terminating: %d", cmd.Process.Pid)
+				log.Logf(10, "exec: terminating: %d", cmd.Process.Pid)
 				cmd.Process.Signal(syscall.SIGTERM)
 			case <-ctx.Done():
 				return
@@ -81,28 +83,28 @@ func (f *ExecStreamManager) NewStream(name string) Stream {
 
 			select {
 			case <-time.After(10 * time.Second):
-				Logf(-1, "exec: termination timed out, killing: %d", cmd.Process.Pid)
+				log.Logf(-1, "exec: termination timed out, killing: %d", cmd.Process.Pid)
 				cmd.Process.Kill()
 			case <-ctx.Done():
 				return
 			}
 		}()
 
-		Logf(10, "exec: waiting: %d", cmd.Process.Pid)
+		log.Logf(10, "exec: waiting: %d", cmd.Process.Pid)
 		cmd.Wait()
-		Logf(10, "exec: exited: %d", cmd.Process.Pid)
+		log.Logf(10, "exec: exited: %d", cmd.Process.Pid)
 	}()
 
 	return Stream{
 		Reader: FuncReadCloser(stdout, func() error {
 			close(stdoutClosed)
-			Logf(10, "exec: closing stdout: %d", cmd.Process.Pid)
+			log.Logf(10, "exec: closing stdout: %d", cmd.Process.Pid)
 			err := stdout.Close()
 			return err
 		}),
 		Writer: FuncWriteCloser(w, func() error {
 			close(stdinClosed)
-			Logf(10, "exec: closing stdin: %d", cmd.Process.Pid)
+			log.Logf(10, "exec: closing stdin: %d", cmd.Process.Pid)
 			return w.Close()
 		}),
 	}

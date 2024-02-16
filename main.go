@@ -12,6 +12,7 @@ import (
 	"github.com/isobit/cli"
 
 	"github.com/isobit/ndog/internal"
+	ndog_log "github.com/isobit/ndog/internal/log"
 	"github.com/isobit/ndog/internal/schemes"
 )
 
@@ -20,7 +21,7 @@ var Version string = "unknown"
 func main() {
 	if stderrStat, err := os.Stderr.Stat(); err == nil {
 		if stderrStat.Mode()&os.ModeCharDevice != 0 {
-			ndog.LogColor = true
+			ndog_log.LogColor = true
 		}
 	}
 
@@ -29,7 +30,7 @@ func main() {
 		Run()
 
 	if err != nil && err != cli.ErrHelp {
-		ndog.Logf(-1, "error: %s", err)
+		ndog_log.Logf(-1, "error: %s", err)
 	}
 }
 
@@ -71,13 +72,13 @@ func (cmd Ndog) Run() error {
 	case cmd.Verbose && cmd.Quiet:
 		return cli.UsageErrorf("--verbose and --quiet are mutually exclusive")
 	case cmd.LogLevel != 0:
-		ndog.LogLevel = cmd.LogLevel
+		ndog_log.LogLevel = cmd.LogLevel
 	case cmd.Quiet:
-		ndog.LogLevel = -10
+		ndog_log.LogLevel = -10
 	case cmd.Verbose:
-		ndog.LogLevel = 1
+		ndog_log.LogLevel = 1
 	case cmd.Debug:
-		ndog.LogLevel = 10
+		ndog_log.LogLevel = 10
 	}
 
 	// Parse options.

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/log"
 )
 
 var Scheme = &ndog.Scheme{
@@ -53,7 +54,7 @@ func Connect(cfg ndog.ConnectConfig) error {
 
 	cc := conn.Config()
 	name := fmt.Sprintf("%s:%d", cc.Host, cc.Port)
-	ndog.Logf(0, "connected: %s", name)
+	log.Logf(0, "connected: %s", name)
 
 	stream := cfg.Stream
 
@@ -61,19 +62,19 @@ func Connect(cfg ndog.ConnectConfig) error {
 	scanner.Split(splitStatements)
 	for scanner.Scan() {
 		stmt := scanner.Text()
-		ndog.Logf(1, "execute: %s", strconv.Quote(stmt))
+		log.Logf(1, "execute: %s", strconv.Quote(stmt))
 		rows, err := conn.Query(ctx, stmt)
 		if err != nil {
-			ndog.Logf(-1, "error executing query: %s", err)
+			log.Logf(-1, "error executing query: %s", err)
 			continue
 		}
 		if opts.JSON {
 			if err := rowsToJSON(stream.Writer, rows); err != nil {
-				ndog.Logf(-1, "error converting rows to JSON: %s", err)
+				log.Logf(-1, "error converting rows to JSON: %s", err)
 			}
 		} else {
 			if err := rowsToCSV(stream.Writer, rows); err != nil {
-				ndog.Logf(-1, "error converting rows to CSV: %s", err)
+				log.Logf(-1, "error converting rows to CSV: %s", err)
 			}
 		}
 	}

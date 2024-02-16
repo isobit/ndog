@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"io"
 	"os"
+
+	"github.com/isobit/ndog/internal/log"
 )
 
 type StdIOStreamManager struct {
@@ -41,10 +43,10 @@ func FanoutStdin() *Fanout {
 		defer fanout.Close()
 		if _, err := io.Copy(fanout, os.Stdin); err != nil {
 			if !IsIOClosedErr(err) {
-				Logf(-1, "stdin read error: %s", err)
+				log.Logf(-1, "stdin read error: %s", err)
 			}
 		}
-		Logf(10, "stdin EOF")
+		log.Logf(10, "stdin EOF")
 		// os.Exit(1) // TODO clean shutdown
 	}()
 	return fanout

@@ -13,6 +13,7 @@ import (
 	"github.com/sourcegraph/conc"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/log"
 )
 
 var WSScheme = &ndog.Scheme{
@@ -73,24 +74,24 @@ func Listen(cfg ndog.ListenConfig) error {
 	s := &http.Server{
 		Addr: cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ndog.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
+			log.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
 			if r.Host != cfg.URL.Host {
-				ndog.Logf(1, "request header: Host: %s", r.Host)
+				log.Logf(1, "request header: Host: %s", r.Host)
 			}
 			for key, values := range r.Header {
-				ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
+				log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
 
 			upgrader := &websocket.Upgrader{}
 			conn, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
-				ndog.Logf(-1, "error upgrading request: %w", err)
+				log.Logf(-1, "error upgrading request: %w", err)
 				return
 			}
 			defer conn.Close()
 
-			ndog.Logf(2, "upgraded %s", r.RemoteAddr)
-			defer ndog.Logf(1, "closed: %s", r.RemoteAddr)
+			log.Logf(2, "upgraded %s", r.RemoteAddr)
+			defer log.Logf(1, "closed: %s", r.RemoteAddr)
 
 			stream := cfg.StreamManager.NewStream(r.RemoteAddr)
 			defer stream.Close()
@@ -98,7 +99,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			bidirectionalCopy(conn, stream, opts.MessageType)
 		}),
 	}
-	ndog.Logf(0, "listening: %s", s.Addr)
+	log.Logf(0, "listening: %s", s.Addr)
 	return s.ListenAndServe()
 }
 
@@ -171,10 +172,10 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	remoteAddr := conn.RemoteAddr()
-	ndog.Logf(0, "connected: %s", remoteAddr)
+	log.Logf(0, "connected: %s", remoteAddr)
 	defer func() {
 		conn.Close()
-		ndog.Logf(0, "closed: %s", remoteAddr)
+		log.Logf(0, "closed: %s", remoteAddr)
 	}()
 
 	bidirectionalCopy(conn, cfg.Stream, opts.MessageType)
@@ -192,14 +193,14 @@ func bidirectionalCopy(conn *websocket.Conn, stream ndog.Stream, sendMsgType int
 			msgType, msg, err := conn.ReadMessage()
 			if err != nil {
 				if !errors.Is(err, net.ErrClosed) {
-					ndog.Logf(-1, "read error: %s", err)
+					log.Logf(-1, "read error: %s", err)
 				}
 				return
 			}
-			ndog.Logf(2, "received message (type=%d)", msgType)
+			log.Logf(2, "received message (type=%d)", msgType)
 			if _, err := stream.Writer.Write(append(msg, '\n')); err != nil {
 				if !ndog.IsIOClosedErr(err) {
-					ndog.Logf(-1, "read error: %s", err)
+					log.Logf(-1, "read error: %s", err)
 				}
 				return
 			}
@@ -213,15 +214,15 @@ func bidirectionalCopy(conn *websocket.Conn, stream ndog.Stream, sendMsgType int
 		for s.Scan() {
 			if err := conn.WriteMessage(sendMsgType, s.Bytes()); err != nil {
 				if !errors.Is(err, net.ErrClosed) {
-					ndog.Logf(-1, "write error: %s", err)
+					log.Logf(-1, "write error: %s", err)
 				}
 				return
 			}
-			ndog.Logf(2, "sent message")
+			log.Logf(2, "sent message")
 		}
 		if err := s.Err(); err != nil {
 			if !ndog.IsIOClosedErr(err) {
-				ndog.Logf(-1, "write error: %s", err)
+				log.Logf(-1, "write error: %s", err)
 			}
 		}
 	})

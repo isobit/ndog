@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/log"
 )
 
 var Scheme = &ndog.Scheme{
@@ -34,7 +35,7 @@ func Listen(cfg ndog.ListenConfig) error {
 		return err
 	}
 	defer conn.Close()
-	ndog.Logf(0, "listening: %s", conn.LocalAddr())
+	log.Logf(0, "listening: %s", conn.LocalAddr())
 
 	streams := map[string]ndog.Stream{}
 
@@ -53,14 +54,14 @@ func Listen(cfg ndog.ListenConfig) error {
 			return err
 		}
 		remoteAddrStr := remoteAddr.String()
-		ndog.Logf(10, "%d bytes from %s", nr, remoteAddrStr)
+		log.Logf(10, "%d bytes from %s", nr, remoteAddrStr)
 
 		var stream ndog.Stream
 		if existingStream, ok := streams[remoteAddrStr]; ok {
-			ndog.Logf(10, "using existing stream: %s", remoteAddrStr)
+			log.Logf(10, "using existing stream: %s", remoteAddrStr)
 			stream = existingStream
 		} else {
-			ndog.Logf(10, "creating new stream: %s", remoteAddrStr)
+			log.Logf(10, "creating new stream: %s", remoteAddrStr)
 			stream = cfg.StreamManager.NewStream(remoteAddrStr)
 			// TODO close stream reader on timeout
 			streams[remoteAddrStr] = stream
@@ -104,13 +105,13 @@ func Connect(cfg ndog.ConnectConfig) error {
 	defer conn.Close()
 
 	remoteAddr := conn.RemoteAddr()
-	ndog.Logf(0, "connected: %s", remoteAddr)
+	log.Logf(0, "connected: %s", remoteAddr)
 
 	stream := cfg.Stream
 
 	go io.Copy(conn, stream.Reader)
 	_, err = io.Copy(stream.Writer, conn)
 
-	ndog.Logf(0, "closed: %s", remoteAddr)
+	log.Logf(0, "closed: %s", remoteAddr)
 	return err
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/sourcegraph/conc"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/log"
 )
 
 var Scheme = &ndog.Scheme{
@@ -37,14 +38,14 @@ func Listen(cfg ndog.ListenConfig) error {
 		return err
 	}
 	defer listener.Close()
-	ndog.Logf(0, "listening: %s", listener.Addr())
+	log.Logf(0, "listening: %s", listener.Addr())
 
 	handleConn := func(conn *net.TCPConn) {
 		defer conn.Close()
 
 		remoteAddr := conn.RemoteAddr()
-		ndog.Logf(1, "accepted: %s", remoteAddr)
-		defer ndog.Logf(1, "closed: %s", remoteAddr)
+		log.Logf(1, "accepted: %s", remoteAddr)
+		defer log.Logf(1, "closed: %s", remoteAddr)
 
 		stream := cfg.StreamManager.NewStream(remoteAddr.String())
 		defer stream.Close()
@@ -56,9 +57,9 @@ func Listen(cfg ndog.ListenConfig) error {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
 			if conn != nil {
-				ndog.Logf(-1, "accept error: %s: %s", conn.RemoteAddr(), err)
+				log.Logf(-1, "accept error: %s: %s", conn.RemoteAddr(), err)
 			} else {
-				ndog.Logf(-1, "accept error: %s", err)
+				log.Logf(-1, "accept error: %s", err)
 			}
 			continue
 		}
@@ -79,8 +80,8 @@ func Connect(cfg ndog.ConnectConfig) error {
 	defer conn.Close()
 
 	remoteAddr := conn.RemoteAddr()
-	ndog.Logf(0, "connected: %s", remoteAddr)
-	defer ndog.Logf(0, "closed: %s", remoteAddr)
+	log.Logf(0, "connected: %s", remoteAddr)
+	defer log.Logf(0, "closed: %s", remoteAddr)
 
 	bidirectionalCopy(conn, cfg.Stream)
 
@@ -104,7 +105,7 @@ func bidirectionalCopy(conn *net.TCPConn, stream ndog.Stream) {
 
 		if _, err := io.Copy(conn, stream.Reader); err != nil {
 			if !ndog.IsIOClosedErr(err) && !errors.Is(err, net.ErrClosed) {
-				ndog.Logf(-1, "write error: %s", err)
+				log.Logf(-1, "write error: %s", err)
 			}
 		}
 	})
@@ -114,7 +115,7 @@ func bidirectionalCopy(conn *net.TCPConn, stream ndog.Stream) {
 
 		if _, err := io.Copy(stream.Writer, conn); err != nil {
 			if !ndog.IsIOClosedErr(err) && !errors.Is(err, net.ErrClosed) {
-				ndog.Logf(-1, "read error: %s", err)
+				log.Logf(-1, "read error: %s", err)
 			}
 		}
 	})

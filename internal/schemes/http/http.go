@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	stdlog "log"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/tinylib/msgp/msgp"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/log"
 )
 
 var HTTPScheme = &ndog.Scheme{
@@ -115,18 +117,18 @@ func Listen(cfg ndog.ListenConfig) error {
 		return err
 	}
 	if opts.ServeFile != "" {
-		ndog.Logf(1, "http: will serve file(s) from %s", opts.ServeFile)
+		log.Logf(1, "http: will serve file(s) from %s", opts.ServeFile)
 	}
 
 	s := &http.Server{
 		Addr: cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ndog.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
+			log.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
 			if r.Host != cfg.URL.Host {
-				ndog.Logf(1, "request header: Host: %s", r.Host)
+				log.Logf(1, "request header: Host: %s", r.Host)
 			}
 			for key, values := range r.Header {
-				ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
+				log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
 			if opts.ServeFile != "" {
 				http.ServeFile(w, r, filepath.Join(opts.ServeFile, r.URL.Path))
@@ -141,17 +143,17 @@ func Listen(cfg ndog.ListenConfig) error {
 			if opts.MsgpackToJSON && (contentType == "application/msgpack" || contentType == "application/x-msgpack") {
 				body, err := ioutil.ReadAll(r.Body)
 				if err != nil {
-					ndog.Logf(-1, "error reading request body: %s", err)
+					log.Logf(-1, "error reading request body: %s", err)
 					return
 				}
 				if _, err := msgp.UnmarshalAsJSON(stream.Writer, body); err != nil {
-					ndog.Logf(-1, "error unmarshaling request body msgpack as JSON: %s", err)
+					log.Logf(-1, "error unmarshaling request body msgpack as JSON: %s", err)
 					return
 				}
 				stream.Writer.Write([]byte{'\n'})
 			} else {
 				if _, err := io.Copy(stream.Writer, r.Body); err != nil {
-					ndog.Logf(-1, "error reading request body: %s", err)
+					log.Logf(-1, "error reading request body: %s", err)
 					return
 				}
 				stream.Writer.Write([]byte{'\n'})
@@ -162,16 +164,16 @@ func Listen(cfg ndog.ListenConfig) error {
 			for key, val := range opts.Headers {
 				w.Header().Add(key, val)
 			}
-			ndog.Logf(10, "writing status code %d", opts.StatusCode)
+			log.Logf(10, "writing status code %d", opts.StatusCode)
 			w.WriteHeader(opts.StatusCode)
 			if _, err := io.Copy(w, stream.Reader); err != nil {
-				ndog.Logf(-1, "error writing response body: %s", err)
+				log.Logf(-1, "error writing response body: %s", err)
 				return
 			}
-			ndog.Logf(10, "handler closed")
+			log.Logf(10, "handler closed")
 		}),
 	}
-	ndog.Logf(0, "listening: %s", s.Addr)
+	log.Logf(0, "listening: %s", s.Addr)
 	return s.ListenAndServe()
 }
 
@@ -251,25 +253,25 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 	for key, val := range opts.Headers {
 		if strings.EqualFold(key, "host") {
-			ndog.Logf(2, "setting host: %s", val)
+			log.Logf(2, "setting host: %s", val)
 			httpReq.Host = val
 		}
 		httpReq.Header.Add(key, val)
 	}
 
 	// Do request
-	ndog.Logf(0, "request: %s %s", opts.Method, reqUrl.RequestURI())
+	log.Logf(0, "request: %s %s", opts.Method, reqUrl.RequestURI())
 	for key, values := range httpReq.Header {
-		ndog.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
+		log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 	}
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return err
 	}
 
-	ndog.Logf(0, "response: %s", resp.Status)
+	log.Logf(0, "response: %s", resp.Status)
 	for key, values := range resp.Header {
-		ndog.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
+		log.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
 	}
 
 	if opts.GraphQL {
