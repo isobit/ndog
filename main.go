@@ -14,6 +14,7 @@ import (
 	"github.com/isobit/ndog/internal"
 	ndog_log "github.com/isobit/ndog/internal/log"
 	"github.com/isobit/ndog/internal/schemes"
+	ndog_tls "github.com/isobit/ndog/internal/tls"
 )
 
 var Version string = "unknown"
@@ -54,6 +55,8 @@ type Ndog struct {
 	LogIO    bool `cli:"help=log all I/O"`
 
 	Version bool `cli:"short=V,help=show version"`
+
+	TLS ndog_tls.Options `cli:"embed"`
 }
 
 func (cmd Ndog) Run() error {
@@ -151,6 +154,7 @@ func (cmd Ndog) Run() error {
 			Config: ndog.Config{
 				URL:     cmd.ListenURL,
 				Options: opts,
+				TLS:     cmd.TLS,
 			},
 			StreamManager: streamManager,
 		})
@@ -161,6 +165,7 @@ func (cmd Ndog) Run() error {
 			Config: ndog.Config{
 				URL:     cmd.ConnectURL,
 				Options: opts,
+				TLS:     cmd.TLS,
 			},
 			Stream: stream,
 		})

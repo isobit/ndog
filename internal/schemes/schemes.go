@@ -15,7 +15,6 @@ import (
 func init() {
 	registerSchemes(
 		http.HTTPScheme,
-		http.HTTPSScheme,
 		http.HTTPGraphQLScheme,
 		postgresql.Scheme,
 		postgresql.ListenScheme,
@@ -24,7 +23,6 @@ func init() {
 		tcp.Scheme,
 		udp.Scheme,
 		websocket.WSScheme,
-		websocket.WSSScheme,
 	)
 }
 

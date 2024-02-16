@@ -3,7 +3,6 @@ package websocket
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -17,7 +16,7 @@ import (
 )
 
 var WSScheme = &ndog.Scheme{
-	Names:   []string{"ws"},
+	Names:   []string{"ws", "wss"},
 	Listen:  Listen,
 	Connect: Connect,
 
@@ -33,16 +32,6 @@ Examples:
 	ConnectOptionHelp: connectOptionHelp,
 }
 
-var WSSScheme = &ndog.Scheme{
-	Names:   []string{"wss"},
-	Connect: Connect,
-
-	Description: `
-Connect opens a WebSocket connection to the specified URL.
-	`,
-	ConnectOptionHelp: connectOptionHelp,
-}
-
 type ListenOptions struct {
 	MessageType int
 }
@@ -50,8 +39,8 @@ type ListenOptions struct {
 var listenOptionHelp = ndog.OptionsHelp{}.
 	Add("text", "", "Send using text data frames instead of binary")
 
-func extractListenOptions(opts ndog.Options) (ConnectOptions, error) {
-	o := ConnectOptions{
+func extractListenOptions(opts ndog.Options) (ListenOptions, error) {
+	o := ListenOptions{
 		MessageType: websocket.BinaryMessage,
 	}
 
@@ -62,10 +51,6 @@ func extractListenOptions(opts ndog.Options) (ConnectOptions, error) {
 	return o, opts.Done()
 }
 func Listen(cfg ndog.ListenConfig) error {
-	if cfg.URL.Scheme == "wss" {
-		return fmt.Errorf("listen does not support secure websockets yet")
-	}
-
 	opts, err := extractListenOptions(cfg.Options)
 	if err != nil {
 		return err
@@ -98,6 +83,15 @@ func Listen(cfg ndog.ListenConfig) error {
 
 			bidirectionalCopy(conn, stream, opts.MessageType)
 		}),
+	}
+	if cfg.URL.Scheme == "wss" {
+		tlsConfig, err := cfg.TLS.Config(false, nil)
+		if err != nil {
+			return err
+		}
+		s.TLSConfig = tlsConfig
+		log.Logf(0, "listening: %s", s.Addr)
+		return s.ListenAndServeTLS("", "")
 	}
 	log.Logf(0, "listening: %s", s.Addr)
 	return s.ListenAndServe()
@@ -159,8 +153,14 @@ func Connect(cfg ndog.ConnectConfig) error {
 		header.Add(key, val)
 	}
 
+	tlsConfig, err := cfg.TLS.Config(false, nil)
+	if err != nil {
+		return err
+	}
+
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
+		TLSClientConfig:  tlsConfig,
 	}
 	if opts.Protocol != "" {
 		dialer.Subprotocols = []string{opts.Protocol}

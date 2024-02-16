@@ -1,11 +1,11 @@
 package http
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	stdlog "log"
 	"net/http"
 	"path/filepath"
@@ -18,7 +18,7 @@ import (
 )
 
 var HTTPScheme = &ndog.Scheme{
-	Names:   []string{"http"},
+	Names:   []string{"http", "https"},
 	Connect: Connect,
 	Listen:  Listen,
 
@@ -34,19 +34,6 @@ Examples:
 	`,
 	ConnectOptionHelp: connectOptionHelp,
 	ListenOptionHelp:  listenOptionHelp,
-}
-
-var HTTPSScheme = &ndog.Scheme{
-	Names:   []string{"https"},
-	Connect: Connect,
-
-	Description: `
-Connect sends input as an HTTPS request body to the specified URL.
-
-Examples:
-	GET request: ndog -c 'https://example.net/' -d ''
-	`,
-	ConnectOptionHelp: connectOptionHelp,
 }
 
 var HTTPGraphQLScheme = &ndog.Scheme{
@@ -120,8 +107,18 @@ func Listen(cfg ndog.ListenConfig) error {
 		log.Logf(1, "http: will serve file(s) from %s", opts.ServeFile)
 	}
 
+	errLogReader, errLogWriter := io.Pipe()
+	defer errLogWriter.Close()
+	go func() {
+		s := bufio.NewScanner(errLogReader)
+		for s.Scan() {
+			log.Logf(-1, s.Text())
+		}
+	}()
+
 	s := &http.Server{
-		Addr: cfg.URL.Host,
+		ErrorLog: stdlog.New(errLogWriter, "", 0),
+		Addr:     cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			log.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
 			if r.Host != cfg.URL.Host {
@@ -141,7 +138,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			// Receive request.
 			contentType := r.Header.Get("Content-Type")
 			if opts.MsgpackToJSON && (contentType == "application/msgpack" || contentType == "application/x-msgpack") {
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					log.Logf(-1, "error reading request body: %s", err)
 					return
@@ -172,6 +169,15 @@ func Listen(cfg ndog.ListenConfig) error {
 			}
 			log.Logf(10, "handler closed")
 		}),
+	}
+	if cfg.URL.Scheme == "https" {
+		tlsConfig, err := cfg.TLS.Config(true, []string{cfg.URL.Hostname()})
+		if err != nil {
+			return err
+		}
+		s.TLSConfig = tlsConfig
+		log.Logf(0, "listening: %s", s.Addr)
+		return s.ListenAndServeTLS("", "")
 	}
 	log.Logf(0, "listening: %s", s.Addr)
 	return s.ListenAndServe()
@@ -259,12 +265,24 @@ func Connect(cfg ndog.ConnectConfig) error {
 		httpReq.Header.Add(key, val)
 	}
 
+	tlsConfig, err := cfg.TLS.Config(false, nil)
+	if err != nil {
+		return err
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+	client := &http.Client{
+		Transport: transport,
+	}
+
 	// Do request
 	log.Logf(0, "request: %s %s", opts.Method, reqUrl.RequestURI())
 	for key, values := range httpReq.Header {
 		log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 	}
-	resp, err := http.DefaultClient.Do(httpReq)
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return err
 	}
