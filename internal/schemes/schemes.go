@@ -27,18 +27,27 @@ func init() {
 }
 
 var Registry = map[string]*ndog.Scheme{}
+var fullRegistry = map[string]*ndog.Scheme{}
 
 func registerSchemes(schemes ...*ndog.Scheme) {
 	for _, scheme := range schemes {
 		for _, name := range scheme.Names {
-			if _, exists := Registry[name]; exists {
+			if _, exists := fullRegistry[name]; exists {
 				panic(fmt.Sprintf("conflicting scheme name: %s", name))
 			}
+			fullRegistry[name] = scheme
 			Registry[name] = scheme
+		}
+		for _, name := range scheme.HiddenNames {
+			if _, exists := fullRegistry[name]; exists {
+				panic(fmt.Sprintf("conflicting scheme name: %s", name))
+			}
+			fullRegistry[name] = scheme
 		}
 	}
 }
 
-func Lookup(urlScheme string) *ndog.Scheme {
-	return Registry[urlScheme]
+func Lookup(urlScheme string) (*ndog.Scheme, bool) {
+	scheme, ok := fullRegistry[urlScheme]
+	return scheme, ok
 }

@@ -9,6 +9,7 @@ import (
 	stdlog "log"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/tinylib/msgp/msgp"
@@ -18,7 +19,9 @@ import (
 )
 
 var HTTPScheme = &ndog.Scheme{
-	Names:   []string{"http", "https"},
+	Names:       []string{"http", "https"},
+	HiddenNames: []string{}, // will be initialized in init()
+
 	Connect: Connect,
 	Listen:  Listen,
 
@@ -34,6 +37,15 @@ Examples:
 	`,
 	ConnectOptionHelp: connectOptionHelp,
 	ListenOptionHelp:  listenOptionHelp,
+}
+
+func init() {
+	for _, scheme := range HTTPScheme.Names {
+		for _, method := range methods {
+			HTTPScheme.HiddenNames = append(HTTPScheme.HiddenNames, scheme+"+"+method)
+			HTTPScheme.HiddenNames = append(HTTPScheme.HiddenNames, scheme+"+"+strings.ToLower(method))
+		}
+	}
 }
 
 var HTTPGraphQLScheme = &ndog.Scheme{
@@ -197,16 +209,33 @@ var connectOptionHelpGraphql = ndog.OptionsHelp{}.
 	Add("header.<NAME>", "<VALUE>", "extra request headers to send").
 	Add("method", "<METHOD>", "HTTP method to use (default: POST)")
 
+var methods = []string{
+	http.MethodGet,
+	http.MethodHead,
+	http.MethodPost,
+	http.MethodPut,
+	http.MethodPatch,
+	http.MethodDelete,
+	http.MethodConnect,
+	http.MethodOptions,
+	http.MethodTrace,
+}
+
 func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions, error) {
 	o := connectOptions{
 		Method:  "GET",
 		Headers: map[string]string{},
 	}
 
-	if subscheme == "graphql" {
+	switch subscheme {
+	case "graphql":
 		o.GraphQL = true
 		o.Method = "POST"
 		o.Headers["Content-Type"] = "application/json"
+	default:
+		if m := strings.ToUpper(subscheme); slices.Contains(methods, m) {
+			o.Method = m
+		}
 	}
 
 	if val, ok := opts.Pop("method"); ok {

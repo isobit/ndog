@@ -9,7 +9,8 @@ import (
 )
 
 type Scheme struct {
-	Names []string
+	Names       []string
+	HiddenNames []string
 
 	Listen  func(ListenConfig) error
 	Connect func(ConnectConfig) error
