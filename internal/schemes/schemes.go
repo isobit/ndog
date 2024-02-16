@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/schemes/dns"
 	"github.com/isobit/ndog/internal/schemes/http"
 	"github.com/isobit/ndog/internal/schemes/postgresql"
 	"github.com/isobit/ndog/internal/schemes/ssh"
@@ -14,6 +15,7 @@ import (
 
 func init() {
 	registerSchemes(
+		dns.Scheme,
 		http.HTTPScheme,
 		http.HTTPGraphQLScheme,
 		postgresql.Scheme,
