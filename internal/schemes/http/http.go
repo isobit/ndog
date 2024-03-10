@@ -196,9 +196,10 @@ func Listen(cfg ndog.ListenConfig) error {
 }
 
 type connectOptions struct {
-	Method  string
-	Headers map[string]string
-	GraphQL bool
+	Method          string
+	Headers         map[string]string
+	FollowRedirects bool
+	GraphQL         bool
 }
 
 var connectOptionHelp = ndog.OptionsHelp{}.
@@ -240,6 +241,10 @@ func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions,
 
 	if val, ok := opts.Pop("method"); ok {
 		o.Method = strings.ToUpper(val)
+	}
+
+	if _, ok := opts.Pop("follow_redirects"); ok {
+		o.FollowRedirects = true
 	}
 
 	headerKeyPrefix := "header."
@@ -304,6 +309,11 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 	client := &http.Client{
 		Transport: transport,
+	}
+	if !opts.FollowRedirects {
+		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
 	}
 
 	// Do request
