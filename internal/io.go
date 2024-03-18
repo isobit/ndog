@@ -184,6 +184,7 @@ func MultiWriteCloser(writerClosers ...io.WriteCloser) io.WriteCloser {
 		return nil
 	})
 }
+
 func NopWriteCloser(w io.Writer) io.WriteCloser {
 	return nopWriteCloser{Writer: w}
 }
