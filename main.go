@@ -54,6 +54,9 @@ type Ndog struct {
 	LogLevel int  `cli:"hidden"`
 	LogIO    bool `cli:"help=log all I/O"`
 
+	RecvOut string
+	SendOut string
+
 	Version bool `cli:"short=V,help=show version"`
 
 	TLS ndog_tls.Options `cli:"embed"`
@@ -146,6 +149,30 @@ func (cmd Ndog) Run() error {
 	}
 	if cmd.LogIO {
 		streamManager = ndog.NewLogStreamManager(streamManager)
+	}
+	if cmd.RecvOut != "" || cmd.SendOut != "" {
+		fsm := &ndog.LogFileStreamManager{
+			Delegate: streamManager,
+		}
+		if cmd.RecvOut != "" {
+			// f, err := os.OpenFile(cmd.RecvOut, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			f, err := os.Create(cmd.RecvOut)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			fsm.RecvOut = f
+		}
+		if cmd.SendOut != "" {
+			// f, err := os.OpenFile(cmd.SendOut, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			f, err := os.Create(cmd.SendOut)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			fsm.SendOut = f
+		}
+		streamManager = fsm
 	}
 
 	switch {

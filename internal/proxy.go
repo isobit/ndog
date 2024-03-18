@@ -20,20 +20,10 @@ func (f ProxyStreamManager) NewStream(name string) Stream {
 	listenStream := Stream{
 		Reader: connectReader,
 		Writer: listenWriter,
-		// CloseWriterFunc: listenWriter.Close,
-		// CloseFunc: func() error {
-		// 	Logf(10, "closing proxy listen stream: %s", name)
-		// 	return listenWriter.Close()
-		// },
 	}
 	connectStream := Stream{
 		Reader: listenReader,
 		Writer: connectWriter,
-		// CloseWriterFunc: connectWriter.Close,
-		// CloseFunc: func() error {
-		// 	Logf(10, "closing proxy connect stream: %s", name)
-		// 	return connectWriter.Close()
-		// },
 	}
 
 	go func() {
@@ -48,12 +38,4 @@ func (f ProxyStreamManager) NewStream(name string) Stream {
 	}()
 
 	return listenStream
-}
-
-type proxyPipe struct {
-	stream Stream
-}
-
-func (p proxyPipe) NewStream(name string) Stream {
-	return p.stream
 }
