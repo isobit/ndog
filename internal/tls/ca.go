@@ -102,20 +102,26 @@ func hostsToIPAndDNS(hosts []string) ([]net.IP, []string) {
 	ips := []net.IP{}
 	dnsNames := []string{}
 	for _, host := range hosts {
+		if host == "" {
+			continue
+		}
 		host := host
 		ip := net.ParseIP(host)
 		if ip != nil {
 			ips = append(ips, ip)
 		} else {
 			dnsNames = append(dnsNames, host)
-
 			for _, network := range []string{"ip4", "ip6"} {
 				addr, err := net.ResolveIPAddr(network, host)
-				if err == nil {
-					ips = append(ips, addr.IP)
-				} else {
+				if err != nil {
 					log.Logf(10, "failed to resolve %s: %s", host, err)
+					continue
 				}
+				if addr == nil || addr.IP == nil {
+					log.Logf(10, "failed to resolve %s: nil address returned", host)
+					continue
+				}
+				ips = append(ips, addr.IP)
 			}
 		}
 	}
