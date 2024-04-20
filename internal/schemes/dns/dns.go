@@ -75,16 +75,16 @@ func Connect(cfg ndog.ConnectConfig) error {
 		}},
 	}
 
-	log.Logf(10, "query:")
-	log.Logf(10, req.String())
+	log.Logf(1, "query:")
+	log.Logf(1, req.String())
 
 	res, _, err := client.Exchange(req, nameserver)
 	if err != nil {
 		return err
 	}
 
-	log.Logf(10, "answer:")
-	log.Logf(10, res.String())
+	log.Logf(1, "answer:")
+	log.Logf(1, res.String())
 
 	if opts.JSON {
 		data, err := json.Marshal(res)
@@ -97,6 +97,11 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	for _, answer := range res.Answer {
+		hdr := answer.Header()
+		if hdr.Rrtype != qtype {
+			log.Logf(10, "skipping answer type %s (does not match %s)", dns.TypeToString[hdr.Rrtype], dns.TypeToString[qtype])
+			continue
+		}
 		switch ans := answer.(type) {
 		case *dns.A:
 			fmt.Fprintln(cfg.Stream.Writer, ans.A)
