@@ -2,6 +2,7 @@ package http
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	stdlog "log"
@@ -183,11 +184,22 @@ func proxyPass(w http.ResponseWriter, r *http.Request, passUrl string) {
 		return
 	}
 	defer resp.Body.Close()
+
+	log.Logf(0, "response: %s", resp.Status)
+	for _, key := range sortedHeaderKeys(resp.Header) {
+		values := resp.Header[key]
+		log.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
+	}
+
 	for key, vals := range resp.Header {
 		for _, val := range vals {
 			w.Header().Set(key, val)
 		}
 	}
 	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	// io.Copy(w, resp.Body)
+
+	bodyBuf := &bytes.Buffer{}
+	io.Copy(io.MultiWriter(w, bodyBuf), resp.Body)
+	log.Logf(1, "response body: %s", bodyBuf)
 }
