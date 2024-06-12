@@ -23,6 +23,7 @@ func init() {
 		postgresql.NotifyScheme,
 		ssh.Scheme,
 		tcp.Scheme,
+		tcp.TLSScheme,
 		udp.Scheme,
 		websocket.WSScheme,
 	)
