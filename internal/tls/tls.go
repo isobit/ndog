@@ -10,7 +10,8 @@ import (
 )
 
 type Options struct {
-	TLSSkipVerify bool `cli:"name=tls-skip-verify,env=NDOG_TLS_SKIP_VERIFY"`
+	TLSSkipVerify bool   `cli:"name=tls-skip-verify,env=NDOG_TLS_SKIP_VERIFY"`
+	TLSServerName string `cli:"name=tls-server-name,env=NDOG_TLS_SERVER_NAME"`
 
 	TLSCert string `cli:"name=tls-cert,env=NDOG_TLS_CERT"`
 	TLSKey  string `cli:"name=tls-key,env=NDOG_TLS_KEY"`
@@ -23,6 +24,7 @@ type Options struct {
 func (opts Options) Config(server bool, hosts []string) (*tls.Config, error) {
 	c := &tls.Config{
 		InsecureSkipVerify: opts.TLSSkipVerify,
+		ServerName:         opts.TLSServerName,
 	}
 
 	if opts.TLSCACert != "" {
