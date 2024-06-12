@@ -74,26 +74,32 @@ func Connect(cfg ndog.ConnectConfig) error {
 		return err
 	}
 
-	// net/http hangs when io.Pipe is used as request body so collect it all
-	// into a simple buffer reader.
-	// https://github.com/golang/go/issues/29246
-	body, err := io.ReadAll(cfg.Stream.Reader)
-	if err != nil {
-		return err
-	}
-
+	var body io.Reader
 	if opts.GraphQL {
-		bodyJson, err := json.Marshal(GraphQLRequest{
-			Query: string(body),
+		queryData, err := io.ReadAll(cfg.Stream.Reader)
+		if err != nil {
+			return err
+		}
+		bodyData, err := json.Marshal(GraphQLRequest{
+			Query: string(queryData),
 		})
 		if err != nil {
 			return err
 		}
-		body = bodyJson
+		body = bytes.NewReader(bodyData)
+	} else if opts.Method != "GET" {
+		// MDN's docs on GET explain of sending request bodies with GET, "while not
+		// prohibited by the specification, the semantics are undefined. It is
+		// better to just avoid sending payloads in GET requests". Since request
+		// bodies really shouldn't be sent with GET anyway, we can avoid hanging
+		// waiting for data on stdin (if the user doesn't close stdin or specify
+		// static empty data as a CLI argument) by only reading the input stream on
+		// non-GET requests.
+		body = cfg.Stream.Reader
 	}
 
 	// Convert to HTTP request
-	httpReq, err := http.NewRequest(opts.Method, reqUrl.String(), bytes.NewReader(body))
+	httpReq, err := http.NewRequest(opts.Method, reqUrl.String(), body)
 	if err != nil {
 		return err
 	}

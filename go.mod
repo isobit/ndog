@@ -1,6 +1,6 @@
 module github.com/isobit/ndog
 
-go 1.18
+go 1.22
 
 require (
 	github.com/gliderlabs/ssh v0.3.5
