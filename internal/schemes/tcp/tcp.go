@@ -97,7 +97,7 @@ type Response struct {
 	Data []byte
 }
 
-func bidirectionalCopy(conn *net.TCPConn, stream ndog.Stream) {
+func bidirectionalCopy(conn io.ReadWriteCloser, stream ndog.Stream) {
 	wg := conc.WaitGroup{}
 	wg.Go(func() {
 		defer conn.Close()
