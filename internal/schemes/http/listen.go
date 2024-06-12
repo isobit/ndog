@@ -96,7 +96,8 @@ func Listen(cfg ndog.ListenConfig) error {
 			if r.Host != cfg.URL.Host {
 				log.Logf(1, "request header: Host: %s", r.Host)
 			}
-			for key, values := range r.Header {
+			for _, key := range sortedHeaderKeys(r.Header) {
+				values := r.Header[key]
 				log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 			}
 			if opts.ServeFile != "" {

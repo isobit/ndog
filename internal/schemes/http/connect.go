@@ -124,7 +124,8 @@ func Connect(cfg ndog.ConnectConfig) error {
 
 	// Do request
 	log.Logf(0, "request: %s %s", opts.Method, reqUrl.RequestURI())
-	for key, values := range httpReq.Header {
+	for _, key := range sortedHeaderKeys(httpReq.Header) {
+		values := httpReq.Header[key]
 		log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
 	}
 	resp, err := client.Do(httpReq)
@@ -133,7 +134,8 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	log.Logf(0, "response: %s", resp.Status)
-	for key, values := range resp.Header {
+	for _, key := range sortedHeaderKeys(resp.Header) {
+		values := resp.Header[key]
 		log.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
 	}
 
