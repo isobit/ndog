@@ -11,6 +11,7 @@ import (
 
 	"github.com/isobit/ndog/internal"
 	"github.com/isobit/ndog/internal/log"
+	"github.com/isobit/ndog/internal/util"
 )
 
 type connectOptions struct {
@@ -130,20 +131,14 @@ func Connect(cfg ndog.ConnectConfig) error {
 
 	// Do request
 	log.Logf(0, "request: %s %s", opts.Method, reqUrl.RequestURI())
-	for _, key := range sortedHeaderKeys(httpReq.Header) {
-		values := httpReq.Header[key]
-		log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
-	}
+	util.LogHeaders("request header: ", httpReq.Header)
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return err
 	}
 
 	log.Logf(0, "response: %s", resp.Status)
-	for _, key := range sortedHeaderKeys(resp.Header) {
-		values := resp.Header[key]
-		log.Logf(1, "response header: %s: %s", key, strings.Join(values, ", "))
-	}
+	util.LogHeaders("response header: ", resp.Header)
 
 	if opts.GraphQL {
 		var bodyJson GraphQLResponse

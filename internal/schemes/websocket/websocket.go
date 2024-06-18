@@ -13,6 +13,7 @@ import (
 
 	"github.com/isobit/ndog/internal"
 	"github.com/isobit/ndog/internal/log"
+	"github.com/isobit/ndog/internal/util"
 )
 
 var WSScheme = &ndog.Scheme{
@@ -63,9 +64,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			if r.Host != cfg.URL.Host {
 				log.Logf(1, "request header: Host: %s", r.Host)
 			}
-			for key, values := range r.Header {
-				log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
-			}
+			util.LogHeaders("request header: ", r.Header)
 
 			upgrader := &websocket.Upgrader{}
 			conn, err := upgrader.Upgrade(w, r, nil)

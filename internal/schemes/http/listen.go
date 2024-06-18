@@ -13,6 +13,7 @@ import (
 
 	"github.com/isobit/ndog/internal"
 	"github.com/isobit/ndog/internal/log"
+	"github.com/isobit/ndog/internal/util"
 )
 
 type listenOptions struct {
@@ -96,10 +97,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			if r.Host != cfg.URL.Host {
 				log.Logf(1, "request header: Host: %s", r.Host)
 			}
-			for _, key := range sortedHeaderKeys(r.Header) {
-				values := r.Header[key]
-				log.Logf(1, "request header: %s: %s", key, strings.Join(values, ", "))
-			}
+			util.LogHeaders("request header: ", r.Header)
 			if opts.ServeFile != "" {
 				http.ServeFile(w, r, filepath.Join(opts.ServeFile, r.URL.Path))
 				return
