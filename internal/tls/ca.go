@@ -61,12 +61,7 @@ func GenerateCA() (*CA, error) {
 	cert := &x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization:  []string{""},
-			Country:       []string{""},
-			Province:      []string{""},
-			Locality:      []string{""},
-			StreetAddress: []string{""},
-			PostalCode:    []string{""},
+			CommonName: "ndog CA",
 		},
 
 		NotBefore: time.Now(),
@@ -134,14 +129,9 @@ func (ca *CA) GenerateAndSignTLSCert(hosts []string) (tls.Certificate, error) {
 	serialNumber, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	cert := &x509.Certificate{
 		SerialNumber: serialNumber,
-		// Subject: pkix.Name{
-		// 	Organization:  []string{""},
-		// 	Country:       []string{""},
-		// 	Province:      []string{""},
-		// 	Locality:      []string{""},
-		// 	StreetAddress: []string{""},
-		// 	PostalCode:    []string{""},
-		// },
+		Subject: pkix.Name{
+			CommonName: "ndog server",
+		},
 
 		NotBefore: time.Now(),
 		NotAfter:  time.Now().AddDate(10, 0, 0),
