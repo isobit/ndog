@@ -15,9 +15,8 @@ import (
 	ndog_log "github.com/isobit/ndog/internal/log"
 	"github.com/isobit/ndog/internal/schemes"
 	ndog_tls "github.com/isobit/ndog/internal/tls"
+	ndog_version "github.com/isobit/ndog/internal/version"
 )
-
-var Version string = "unknown"
 
 func main() {
 	if stderrStat, err := os.Stderr.Stat(); err == nil {
@@ -67,7 +66,7 @@ func (cmd Ndog) Run() error {
 		return schemeHelp(cmd.SchemeHelp)
 	}
 	if cmd.Version {
-		fmt.Fprintln(os.Stderr, Version)
+		fmt.Fprintln(os.Stderr, ndog_version.Version)
 		return nil
 	}
 

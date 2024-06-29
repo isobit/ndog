@@ -1,7 +1,7 @@
 NAME := ndog
 
 VERSION := $(if $(VERSION),$(VERSION),$(shell git describe --tags --match 'v*' HEAD))
-LDFLAGS := -X main.Version=$(VERSION)
+LDFLAGS := -X github.com/isobit/ndog/internal/version.Version=$(VERSION)
 
 .PHONY: all build fmt test lint
 

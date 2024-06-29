@@ -12,6 +12,7 @@ import (
 	"github.com/isobit/ndog/internal"
 	"github.com/isobit/ndog/internal/log"
 	"github.com/isobit/ndog/internal/util"
+	"github.com/isobit/ndog/internal/version"
 )
 
 type connectOptions struct {
@@ -31,8 +32,10 @@ var connectOptionHelpGraphql = ndog.OptionsHelp{}.
 
 func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions, error) {
 	o := connectOptions{
-		Method:  "GET",
-		Headers: map[string]string{},
+		Method: "GET",
+		Headers: map[string]string{
+			"User-Agent": fmt.Sprintf("ndog/%s", version.Version),
+		},
 	}
 
 	switch subscheme {
