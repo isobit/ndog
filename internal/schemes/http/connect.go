@@ -102,6 +102,11 @@ func Connect(cfg ndog.ConnectConfig) error {
 		body = cfg.Stream.Reader
 	}
 
+	tlsConfig, err := cfg.TLS.Config(false, nil)
+	if err != nil {
+		return err
+	}
+
 	// Convert to HTTP request
 	httpReq, err := http.NewRequest(opts.Method, reqUrl.String(), body)
 	if err != nil {
@@ -111,13 +116,13 @@ func Connect(cfg ndog.ConnectConfig) error {
 		if strings.EqualFold(key, "host") {
 			log.Logf(2, "setting host: %s", val)
 			httpReq.Host = val
+
+			if tlsConfig.ServerName == "" && httpReq.URL.Scheme == "https" {
+				log.Logf(1, "TLS server name not explicitly set, using host header value")
+				tlsConfig.ServerName = val
+			}
 		}
 		httpReq.Header.Add(key, val)
-	}
-
-	tlsConfig, err := cfg.TLS.Config(false, nil)
-	if err != nil {
-		return err
 	}
 
 	transport := &http.Transport{
