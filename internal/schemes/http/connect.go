@@ -16,10 +16,11 @@ import (
 )
 
 type connectOptions struct {
-	Method          string
-	Headers         map[string]string
-	FollowRedirects bool
-	GraphQL         bool
+	Method            string
+	Headers           map[string]string
+	FollowRedirects   bool
+	GraphQL           bool
+	DisableKeepAlives bool
 }
 
 var connectOptionHelp = ndog.OptionsHelp{}.
@@ -55,6 +56,10 @@ func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions,
 
 	if _, ok := opts.Pop("follow_redirects"); ok {
 		o.FollowRedirects = true
+	}
+
+	if _, ok := opts.Pop("disable_keepalives"); ok {
+		o.DisableKeepAlives = true
 	}
 
 	headerKeyPrefix := "header."
@@ -121,7 +126,8 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	transport := &http.Transport{
-		TLSClientConfig: tlsConfig,
+		TLSClientConfig:   tlsConfig,
+		DisableKeepAlives: opts.DisableKeepAlives,
 	}
 	client := &http.Client{
 		Transport: transport,
