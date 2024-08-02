@@ -9,45 +9,43 @@ import (
 )
 
 type StdIOStreamManager struct {
-	readCloserFunc func() io.ReadCloser
+	fixedData   []byte
+	stdinFanout *Fanout
 }
 
 func NewStdIOStreamManager(fixedData []byte) *StdIOStreamManager {
-	m := &StdIOStreamManager{}
-
-	if fixedData != nil {
-		m.readCloserFunc = func() io.ReadCloser {
-			var buf bytes.Buffer
-			buf.Write(fixedData)
-			return io.NopCloser(&buf)
-		}
-	} else {
-		fanout := FanoutStdin()
-		m.readCloserFunc = fanout.Tee
+	m := &StdIOStreamManager{
+		fixedData: fixedData,
 	}
-
+	if fixedData == nil {
+		m.stdinFanout = NewFanout()
+		go func() {
+			defer m.stdinFanout.Close()
+			if _, err := io.Copy(m.stdinFanout, os.Stdin); err != nil {
+				if !IsIOClosedErr(err) {
+					log.Logf(-1, "stdin read error: %s", err)
+				}
+			}
+			log.Logf(10, "stdin EOF")
+			// os.Exit(1) // TODO clean shutdown
+		}()
+	}
 	return m
 }
 
 func (m *StdIOStreamManager) NewStream(name string) Stream {
-	rc := m.readCloserFunc()
+	var r io.ReadCloser
+
+	if m.fixedData != nil {
+		var buf bytes.Buffer
+		buf.Write(m.fixedData)
+		r = io.NopCloser(&buf)
+	} else {
+		r = m.stdinFanout.Tee()
+	}
+
 	return Stream{
-		Reader: rc,
+		Reader: r,
 		Writer: NopWriteCloser(os.Stdout),
 	}
-}
-
-func FanoutStdin() *Fanout {
-	fanout := NewFanout()
-	go func() {
-		defer fanout.Close()
-		if _, err := io.Copy(fanout, os.Stdin); err != nil {
-			if !IsIOClosedErr(err) {
-				log.Logf(-1, "stdin read error: %s", err)
-			}
-		}
-		log.Logf(10, "stdin EOF")
-		// os.Exit(1) // TODO clean shutdown
-	}()
-	return fanout
 }
