@@ -25,12 +25,7 @@ Examples:
 }
 
 func Listen(cfg ndog.ListenConfig) error {
-	addr, err := net.ResolveUDPAddr("udp", cfg.URL.Host)
-	if err != nil {
-		return fmt.Errorf("invalid address: %w", err)
-	}
-
-	conn, err := net.ListenUDP("udp", addr)
+	conn, err := cfg.Net.ListenPacket("udp", cfg.URL.Host)
 	if err != nil {
 		return err
 	}
@@ -39,14 +34,14 @@ func Listen(cfg ndog.ListenConfig) error {
 
 	streams := map[string]ndog.Stream{}
 
-	// ReadFromUDP dequeues an entire packet from the socket each time it's
+	// ReadFrom dequeues an entire packet from the socket each time it's
 	// called, so the buffer needs to have enough space to read entire packets
 	// at once. 65535 bytes is the maximum possible packet size; ndog doesn't
 	// know anything about the expected inner protocol, so best to use this
 	// maximum size as the buffer size.
 	buf := make([]byte, 65535)
 	for {
-		nr, remoteAddr, err := conn.ReadFromUDP(buf)
+		nr, remoteAddr, err := conn.ReadFrom(buf)
 		if err != nil {
 			if err == io.EOF || err == net.ErrClosed {
 				return nil
@@ -65,7 +60,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			stream = cfg.StreamManager.NewStream(remoteAddrStr)
 			// TODO close stream reader on timeout
 			streams[remoteAddrStr] = stream
-			go io.Copy(newUDPWriter(conn, remoteAddr), stream.Reader)
+			go io.Copy(&connWriter{conn: conn, addr: remoteAddr}, stream.Reader)
 		}
 
 		// TODO close stream writer on timeout
@@ -76,20 +71,13 @@ func Listen(cfg ndog.ListenConfig) error {
 	}
 }
 
-type udpWriter struct {
-	conn *net.UDPConn
-	addr *net.UDPAddr
+type connWriter struct {
+	conn net.PacketConn
+	addr net.Addr
 }
 
-func newUDPWriter(conn *net.UDPConn, addr *net.UDPAddr) *udpWriter {
-	return &udpWriter{
-		conn: conn,
-		addr: addr,
-	}
-}
-
-func (uw *udpWriter) Write(p []byte) (int, error) {
-	return uw.conn.WriteToUDP(p, uw.addr)
+func (w *connWriter) Write(p []byte) (int, error) {
+	return w.conn.WriteTo(p, w.addr)
 }
 
 func Connect(cfg ndog.ConnectConfig) error {

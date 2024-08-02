@@ -9,7 +9,7 @@ import (
 	"github.com/isobit/ndog/internal/log"
 )
 
-type Options struct {
+type Config struct {
 	TLSSkipVerify bool   `cli:"name=tls-skip-verify,env=NDOG_TLS_SKIP_VERIFY"`
 	TLSServerName string `cli:"name=tls-server-name,env=NDOG_TLS_SERVER_NAME"`
 
@@ -21,32 +21,32 @@ type Options struct {
 	TLSExtraHosts []string `cli:"name=tls-extra-hosts,env=NDOG_TLS_CA_EXTRA_HOSTS,append"`
 }
 
-func (opts Options) Config(server bool, hosts []string) (*tls.Config, error) {
+func (cfg Config) Config(server bool, hosts []string) (*tls.Config, error) {
 	c := &tls.Config{
-		InsecureSkipVerify: opts.TLSSkipVerify,
-		ServerName:         opts.TLSServerName,
+		InsecureSkipVerify: cfg.TLSSkipVerify,
+		ServerName:         cfg.TLSServerName,
 	}
 
-	if opts.TLSCACert != "" {
-		log.Logf(1, "loading TLS root CA cert in %s", opts.TLSCACert)
+	if cfg.TLSCACert != "" {
+		log.Logf(1, "loading TLS root CA cert in %s", cfg.TLSCACert)
 
 		certPool, err := x509.SystemCertPool()
 		if err != nil {
 			return nil, fmt.Errorf("error loading system cert pool: %w", err)
 		}
 
-		certBytes, err := os.ReadFile(opts.TLSCACert)
+		certBytes, err := os.ReadFile(cfg.TLSCACert)
 		if err != nil {
-			return nil, fmt.Errorf("error reading cert %s: %w", opts.TLSCACert, err)
+			return nil, fmt.Errorf("error reading cert %s: %w", cfg.TLSCACert, err)
 		}
 		certPool.AppendCertsFromPEM(certBytes)
 
 		c.RootCAs = certPool
 	}
 
-	if opts.TLSCert != "" && opts.TLSKey != "" {
-		log.Logf(1, "loading TLS cert in %s and key in %s", opts.TLSCACert, opts.TLSCAKey)
-		cert, err := tls.LoadX509KeyPair(opts.TLSCert, opts.TLSKey)
+	if cfg.TLSCert != "" && cfg.TLSKey != "" {
+		log.Logf(1, "loading TLS cert in %s and key in %s", cfg.TLSCACert, cfg.TLSCAKey)
+		cert, err := tls.LoadX509KeyPair(cfg.TLSCert, cfg.TLSKey)
 		if err != nil {
 			return nil, fmt.Errorf("error loading cert: %w", err)
 		}
@@ -57,11 +57,11 @@ func (opts Options) Config(server bool, hosts []string) (*tls.Config, error) {
 	if server && c.Certificates == nil {
 		certHosts := make([]string, len(hosts))
 		copy(certHosts, hosts)
-		if opts.TLSExtraHosts != nil {
-			certHosts = append(certHosts, opts.TLSExtraHosts...)
+		if cfg.TLSExtraHosts != nil {
+			certHosts = append(certHosts, cfg.TLSExtraHosts...)
 		}
 
-		ca, err := opts.getCA()
+		ca, err := cfg.getCA()
 		if err != nil {
 			return nil, fmt.Errorf("error loading CA to generate cert: %w", err)
 		}
@@ -77,10 +77,10 @@ func (opts Options) Config(server bool, hosts []string) (*tls.Config, error) {
 	return c, nil
 }
 
-func (opts Options) getCA() (*CA, error) {
-	if opts.TLSCACert != "" && opts.TLSCAKey != "" {
-		log.Logf(1, "loading TLS CA from cert in %s and key in %s", opts.TLSCACert, opts.TLSCAKey)
-		return LoadCAFromFiles(opts.TLSCACert, opts.TLSCAKey)
+func (cfg Config) getCA() (*CA, error) {
+	if cfg.TLSCACert != "" && cfg.TLSCAKey != "" {
+		log.Logf(1, "loading TLS CA from cert in %s and key in %s", cfg.TLSCACert, cfg.TLSCAKey)
+		return LoadCAFromFiles(cfg.TLSCACert, cfg.TLSCAKey)
 	}
 	log.Logf(1, "generating self-signed TLS CA cert")
 	return GenerateCA()

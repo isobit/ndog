@@ -29,10 +29,11 @@ func TLSListen(cfg ndog.ListenConfig) error {
 		return err
 	}
 
-	listener, err := tls.Listen("tcp", cfg.URL.Host, tlsConfig)
+	tcpListener, err := cfg.Net.Listen("tcp", cfg.URL.Host)
 	if err != nil {
 		return err
 	}
+	listener := tls.NewListener(tcpListener, tlsConfig)
 	defer listener.Close()
 	log.Logf(0, "listening: %s", listener.Addr())
 

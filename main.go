@@ -13,6 +13,7 @@ import (
 
 	"github.com/isobit/ndog/internal"
 	ndog_log "github.com/isobit/ndog/internal/log"
+	"github.com/isobit/ndog/internal/netutil"
 	"github.com/isobit/ndog/internal/schemes"
 	ndog_tls "github.com/isobit/ndog/internal/tls"
 	ndog_version "github.com/isobit/ndog/internal/version"
@@ -55,7 +56,8 @@ type Ndog struct {
 
 	Version bool `cli:"short=V,help=show version"`
 
-	TLS ndog_tls.Options `cli:"embed"`
+	TLS ndog_tls.Config `cli:"embed"`
+	Net netutil.Config  `cli:"embed"`
 }
 
 func (cmd Ndog) Run() error {
@@ -118,15 +120,25 @@ func (cmd Ndog) Run() error {
 	// 	interactive = stdinStat.Mode()&os.ModeCharDevice != 0
 	// }
 
+	connectCfg := ndog.Config{
+		URL:     cmd.ConnectURL,
+		Options: opts,
+		TLS:     cmd.TLS,
+		Net:     cmd.Net,
+	}
+	listenCfg := ndog.Config{
+		URL:     cmd.ListenURL,
+		Options: opts,
+		TLS:     cmd.TLS,
+		Net:     cmd.Net,
+	}
+
 	var streamManager ndog.StreamManager
 	switch {
 	case listenScheme != nil && connectScheme != nil:
 		streamManager = ndog.ProxyStreamManager{
-			ConnectConfig: ndog.Config{
-				Options: opts,
-				URL:     cmd.ConnectURL,
-			},
-			Connect: connectScheme.Connect,
+			ConnectConfig: connectCfg,
+			Connect:       connectScheme.Connect,
 		}
 	case cmd.Exec != "":
 		args, err := shlex.Split(cmd.Exec)
@@ -150,22 +162,14 @@ func (cmd Ndog) Run() error {
 	switch {
 	case listenScheme != nil:
 		return listenScheme.Listen(ndog.ListenConfig{
-			Config: ndog.Config{
-				URL:     cmd.ListenURL,
-				Options: opts,
-				TLS:     cmd.TLS,
-			},
+			Config:        listenCfg,
 			StreamManager: streamManager,
 		})
 	case connectScheme != nil:
 		stream := streamManager.NewStream(cmd.ConnectURL.String())
 		defer stream.Close()
 		return connectScheme.Connect(ndog.ConnectConfig{
-			Config: ndog.Config{
-				URL:     cmd.ConnectURL,
-				Options: opts,
-				TLS:     cmd.TLS,
-			},
+			Config: connectCfg,
 			Stream: stream,
 		})
 	default:

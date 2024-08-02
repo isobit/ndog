@@ -28,19 +28,14 @@ Examples:
 }
 
 func Listen(cfg ndog.ListenConfig) error {
-	addr, err := net.ResolveTCPAddr("tcp", cfg.URL.Host)
-	if err != nil {
-		return fmt.Errorf("invalid address: %w", err)
-	}
-
-	listener, err := net.ListenTCP("tcp", addr)
+	listener, err := cfg.Net.Listen("tcp", cfg.URL.Host)
 	if err != nil {
 		return err
 	}
 	defer listener.Close()
 	log.Logf(0, "listening: %s", listener.Addr())
 
-	handleConn := func(conn *net.TCPConn) {
+	handleConn := func(conn net.Conn) {
 		defer conn.Close()
 
 		remoteAddr := conn.RemoteAddr()
@@ -54,7 +49,7 @@ func Listen(cfg ndog.ListenConfig) error {
 	}
 
 	for {
-		conn, err := listener.AcceptTCP()
+		conn, err := listener.Accept()
 		if err != nil {
 			if conn != nil {
 				log.Logf(-1, "accept error: %s: %s", conn.RemoteAddr(), err)
