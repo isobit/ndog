@@ -3,7 +3,6 @@ package postgresql
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/ioutil"
 	"github.com/isobit/ndog/internal/log"
 )
 
@@ -69,12 +69,9 @@ func listenConnect(cfg ndog.ConnectConfig) error {
 		}
 		log.Logf(1, "notification: %s", notification.Channel)
 		if opts.JSON {
-			data, err := json.Marshal(notification)
-			if err != nil {
+			if err := ioutil.WriteJSON(stream.Writer, notification); err != nil {
 				return err
 			}
-			stream.Writer.Write(data)
-			io.WriteString(stream.Writer, "\n")
 		} else {
 			io.WriteString(stream.Writer, notification.Payload)
 			io.WriteString(stream.Writer, "\n")

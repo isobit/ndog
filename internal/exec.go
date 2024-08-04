@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/isobit/ndog/internal/ioutil"
 	"github.com/isobit/ndog/internal/log"
 )
 
@@ -57,7 +58,7 @@ func (f *ExecStreamManager) NewStream(name string) Stream {
 
 	var w io.WriteCloser = stdin
 	if f.TeeWriter != nil {
-		w = FuncWriteCloser(io.MultiWriter(w, f.TeeWriter), w.Close)
+		w = ioutil.FuncWriteCloser(io.MultiWriter(w, f.TeeWriter), w.Close)
 	}
 
 	stdinClosed := make(chan bool)
@@ -96,13 +97,13 @@ func (f *ExecStreamManager) NewStream(name string) Stream {
 	}()
 
 	return Stream{
-		Reader: FuncReadCloser(stdout, func() error {
+		Reader: ioutil.FuncReadCloser(stdout, func() error {
 			close(stdoutClosed)
 			log.Logf(10, "exec: closing stdout: %d", cmd.Process.Pid)
 			err := stdout.Close()
 			return err
 		}),
-		Writer: FuncWriteCloser(w, func() error {
+		Writer: ioutil.FuncWriteCloser(w, func() error {
 			close(stdinClosed)
 			log.Logf(10, "exec: closing stdin: %d", cmd.Process.Pid)
 			return w.Close()

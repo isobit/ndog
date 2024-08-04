@@ -3,7 +3,6 @@ package postgresql
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/ioutil"
 	"github.com/isobit/ndog/internal/log"
 )
 
@@ -106,13 +106,9 @@ func rowsToJSON(w io.Writer, rows pgx.Rows) error {
 		jsonData = append(jsonData, rowJsonData)
 	}
 
-	data, err := json.Marshal(jsonData)
-	if err != nil {
+	if err := ioutil.WriteJSON(w, jsonData); err != nil {
 		return err
 	}
-
-	w.Write(data)
-	fmt.Fprintf(w, "\n")
 	return nil
 }
 

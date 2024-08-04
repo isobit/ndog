@@ -1,14 +1,13 @@
 package dns
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"reflect"
 	"strings"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/ioutil"
 	"github.com/isobit/ndog/internal/log"
 
 	"github.com/miekg/dns"
@@ -105,13 +104,7 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	if opts.JSON {
-		data, err := json.Marshal(res)
-		if err != nil {
-			return err
-		}
-		cfg.Stream.Writer.Write(data)
-		io.WriteString(cfg.Stream.Writer, "\n")
-		return nil
+		return ioutil.WriteJSON(cfg.Stream.Writer, res)
 	}
 
 	for _, answer := range res.Answer {

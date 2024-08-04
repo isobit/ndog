@@ -12,6 +12,7 @@ import (
 	"github.com/sourcegraph/conc"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/ioutil"
 	"github.com/isobit/ndog/internal/log"
 	"github.com/isobit/ndog/internal/util"
 )
@@ -198,7 +199,7 @@ func bidirectionalCopy(conn *websocket.Conn, stream ndog.Stream, sendMsgType int
 			}
 			log.Logf(2, "received message (type=%d)", msgType)
 			if _, err := stream.Writer.Write(append(msg, '\n')); err != nil {
-				if !ndog.IsIOClosedErr(err) {
+				if !ioutil.IsIOClosedErr(err) {
 					log.Logf(-1, "read error: %s", err)
 				}
 				return
@@ -220,7 +221,7 @@ func bidirectionalCopy(conn *websocket.Conn, stream ndog.Stream, sendMsgType int
 			log.Logf(2, "sent message")
 		}
 		if err := s.Err(); err != nil {
-			if !ndog.IsIOClosedErr(err) {
+			if !ioutil.IsIOClosedErr(err) {
 				log.Logf(-1, "write error: %s", err)
 			}
 		}

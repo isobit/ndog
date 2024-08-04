@@ -1,4 +1,4 @@
-package ndog
+package ioutil
 
 import (
 	"encoding/json"
@@ -25,9 +25,6 @@ func ReadJSON[T any](r io.Reader) (*T, error) {
 func WriteJSON[T any](w io.Writer, v T) error {
 	e := json.NewEncoder(w)
 	if err := e.Encode(v); err != nil {
-		return err
-	}
-	if _, err := w.Write([]byte{'\n'}); err != nil {
 		return err
 	}
 	return nil

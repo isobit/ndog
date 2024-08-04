@@ -4,6 +4,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/isobit/ndog/internal/ioutil"
 	"github.com/isobit/ndog/internal/log"
 )
 
@@ -69,7 +70,7 @@ func streamWithLogging(stream Stream, logRecv func([]byte), logSend func([]byte)
 		}
 	}()
 	return Stream{
-		Reader: TeeReadCloser(stream.Reader, sendWriter),
-		Writer: MultiWriteCloser(stream.Writer, recvWriter),
+		Reader: ioutil.TeeReadCloser(stream.Reader, sendWriter),
+		Writer: ioutil.MultiWriteCloser(stream.Writer, recvWriter),
 	}
 }

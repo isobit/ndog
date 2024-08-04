@@ -5,12 +5,13 @@ import (
 	"io"
 	"os"
 
+	"github.com/isobit/ndog/internal/ioutil"
 	"github.com/isobit/ndog/internal/log"
 )
 
 type StdIOStreamManager struct {
 	fixedData   []byte
-	stdinFanout *Fanout
+	stdinFanout *ioutil.Fanout
 }
 
 func NewStdIOStreamManager(fixedData []byte) *StdIOStreamManager {
@@ -18,11 +19,11 @@ func NewStdIOStreamManager(fixedData []byte) *StdIOStreamManager {
 		fixedData: fixedData,
 	}
 	if fixedData == nil {
-		m.stdinFanout = NewFanout()
+		m.stdinFanout = ioutil.NewFanout()
 		go func() {
 			defer m.stdinFanout.Close()
 			if _, err := io.Copy(m.stdinFanout, os.Stdin); err != nil {
-				if !IsIOClosedErr(err) {
+				if !ioutil.IsIOClosedErr(err) {
 					log.Logf(-1, "stdin read error: %s", err)
 				}
 			}
@@ -46,6 +47,6 @@ func (m *StdIOStreamManager) NewStream(name string) Stream {
 
 	return Stream{
 		Reader: r,
-		Writer: NopWriteCloser(os.Stdout),
+		Writer: ioutil.NopWriteCloser(os.Stdout),
 	}
 }

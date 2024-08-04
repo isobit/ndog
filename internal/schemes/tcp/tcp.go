@@ -9,6 +9,7 @@ import (
 	"github.com/sourcegraph/conc"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/ioutil"
 	"github.com/isobit/ndog/internal/log"
 )
 
@@ -99,7 +100,7 @@ func bidirectionalCopy(conn io.ReadWriteCloser, stream ndog.Stream) {
 		defer stream.Close()
 
 		if _, err := io.Copy(conn, stream.Reader); err != nil {
-			if !ndog.IsIOClosedErr(err) && !errors.Is(err, net.ErrClosed) {
+			if !ioutil.IsIOClosedErr(err) && !errors.Is(err, net.ErrClosed) {
 				log.Logf(-1, "write error: %s", err)
 			}
 		}
@@ -109,7 +110,7 @@ func bidirectionalCopy(conn io.ReadWriteCloser, stream ndog.Stream) {
 		defer stream.Close()
 
 		if _, err := io.Copy(stream.Writer, conn); err != nil {
-			if !ndog.IsIOClosedErr(err) && !errors.Is(err, net.ErrClosed) {
+			if !ioutil.IsIOClosedErr(err) && !errors.Is(err, net.ErrClosed) {
 				log.Logf(-1, "read error: %s", err)
 			}
 		}
