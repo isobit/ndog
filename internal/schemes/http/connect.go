@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	// "golang.org/x/net/http2"
+
 	"github.com/isobit/ndog/internal"
 	"github.com/isobit/ndog/internal/log"
 	"github.com/isobit/ndog/internal/util"
@@ -128,6 +130,10 @@ func Connect(cfg ndog.ConnectConfig) error {
 	transport := &http.Transport{
 		TLSClientConfig: tlsConfig,
 	}
+	// transport := &http2.Transport{
+	// 	TLSClientConfig: tlsConfig,
+	// 	AllowHTTP:       false,
+	// }
 	client := &http.Client{
 		Transport: transport,
 	}
@@ -144,6 +150,7 @@ func Connect(cfg ndog.ConnectConfig) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
 	log.Logf(0, "response: %s", resp.Status)
 	util.LogHeaders("response header: ", resp.Header)

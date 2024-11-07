@@ -39,7 +39,9 @@ func (cfg Config) Config(server bool, hosts []string) (*tls.Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error reading cert %s: %w", cfg.TLSCACert, err)
 		}
-		certPool.AppendCertsFromPEM(certBytes)
+		if ok := certPool.AppendCertsFromPEM(certBytes); !ok {
+			return nil, fmt.Errorf("no certs were appended from %s", cfg.TLSCACert)
+		}
 
 		c.RootCAs = certPool
 	}

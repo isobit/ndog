@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/tinylib/msgp/msgp"
+	"golang.org/x/net/http2"
 
 	"github.com/isobit/ndog/internal"
 	"github.com/isobit/ndog/internal/log"
@@ -93,7 +94,7 @@ func Listen(cfg ndog.ListenConfig) error {
 		ErrorLog: stdlog.New(errLogWriter, "", 0),
 		Addr:     cfg.URL.Host,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Logf(0, "request: %s: %s %s", r.RemoteAddr, r.Method, r.URL)
+			log.Logf(0, "request: %s: %s %s %s", r.RemoteAddr, r.Proto, r.Method, r.URL)
 			if r.Host != cfg.URL.Host {
 				log.Logf(1, "request header: Host: %s", r.Host)
 			}
@@ -151,6 +152,9 @@ func Listen(cfg ndog.ListenConfig) error {
 			return err
 		}
 		s.TLSConfig = tlsConfig
+		if err := http2.ConfigureServer(s, nil); err != nil {
+			return err
+		}
 		log.Logf(0, "listening: %s", s.Addr)
 		return s.ListenAndServeTLS("", "")
 	}
