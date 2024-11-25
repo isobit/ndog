@@ -8,6 +8,24 @@ import (
 	"github.com/isobit/ndog/internal/log"
 )
 
+type Stream2 interface {
+	ReadMessage() (ReadableMessage, error)
+	WriteMessage(WritableMessage) error
+	Close()
+}
+
+type ReadableMessage interface {
+
+}
+
+type WritableMessage interface {
+
+}
+
+type Message interface {
+	Bytes() []byte
+}
+
 type Stream struct {
 	Reader io.ReadCloser
 	Writer io.WriteCloser

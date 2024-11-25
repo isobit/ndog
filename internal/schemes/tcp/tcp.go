@@ -2,7 +2,6 @@ package tcp
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net"
 
@@ -64,12 +63,7 @@ func Listen(cfg ndog.ListenConfig) error {
 }
 
 func Connect(cfg ndog.ConnectConfig) error {
-	addr, err := net.ResolveTCPAddr("tcp", cfg.URL.Host)
-	if err != nil {
-		return fmt.Errorf("invalid address: %w", err)
-	}
-
-	conn, err := net.DialTCP("tcp", nil, addr)
+	conn, err := net.Dial("tcp", cfg.URL.Host)
 	if err != nil {
 		return err
 	}

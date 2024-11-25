@@ -1,18 +1,21 @@
 package udp
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net"
 
 	"github.com/isobit/ndog/internal"
+	"github.com/isobit/ndog/internal/ioutil"
 	"github.com/isobit/ndog/internal/log"
 )
 
 var Scheme = &ndog.Scheme{
-	Names:   []string{"udp"},
-	Connect: Connect,
-	Listen:  Listen,
+	Names:            []string{"udp"},
+	Connect:          Connect,
+	Listen:           Listen,
+	ListenOptionHelp: listenOptionHelp,
 
 	Description: `
 Connect opens a UDP connection to the server host and port specified in the URL.
@@ -24,7 +27,32 @@ Examples:
 	`,
 }
 
+type listenOptions struct {
+	Lines bool
+	JSON  bool
+}
+
+var listenOptionHelp = ndog.OptionsHelp{}.
+	Add("lines", "", "delimit individual packets with line breaks").
+	Add("json", "", "output JSON representation of incoming packets")
+
+func extractListenOptions(opts ndog.Options) (listenOptions, error) {
+	o := listenOptions{}
+	if _, ok := opts.Pop("json"); ok {
+		o.JSON = true
+	}
+	if _, ok := opts.Pop("lines"); ok {
+		o.Lines = true
+	}
+	return o, opts.Done()
+}
+
 func Listen(cfg ndog.ListenConfig) error {
+	opts, err := extractListenOptions(cfg.Options)
+	if err != nil {
+		return err
+	}
+
 	conn, err := cfg.Net.ListenPacket("udp", cfg.URL.Host)
 	if err != nil {
 		return err
@@ -48,6 +76,7 @@ func Listen(cfg ndog.ListenConfig) error {
 			}
 			return err
 		}
+		data := buf[:nr]
 		remoteAddrStr := remoteAddr.String()
 		log.Logf(10, "%d bytes from %s", nr, remoteAddrStr)
 
@@ -60,13 +89,38 @@ func Listen(cfg ndog.ListenConfig) error {
 			stream = cfg.StreamManager.NewStream(remoteAddrStr)
 			// TODO close stream reader on timeout
 			streams[remoteAddrStr] = stream
-			go io.Copy(&connWriter{conn: conn, addr: remoteAddr}, stream.Reader)
+			if opts.Lines {
+				go func() {
+					scanner := bufio.NewScanner(stream.Reader)
+					for scanner.Scan() {
+						// TODO handle errors
+						conn.WriteTo(scanner.Bytes(), remoteAddr)
+					}
+				}()
+			} else {
+				go io.Copy(&connWriter{conn: conn, addr: remoteAddr}, stream.Reader)
+			}
 		}
 
-		// TODO close stream writer on timeout
-		_, err = stream.Writer.Write(buf[:nr])
-		if err != nil {
-			return err
+		if opts.JSON {
+			if err := ioutil.WriteJSON(stream.Writer, struct {
+				RemoteAddr string
+				Data       []byte
+			}{
+				RemoteAddr: remoteAddrStr,
+				Data:       data,
+			}); err != nil {
+				return err
+			}
+		} else {
+			if _, err := stream.Writer.Write(data); err != nil {
+				return err
+			}
+			if opts.Lines {
+				if _, err := stream.Writer.Write([]byte{'\n'}); err != nil {
+					return err
+				}
+			}
 		}
 	}
 }
