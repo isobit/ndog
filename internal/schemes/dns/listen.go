@@ -76,11 +76,20 @@ func Listen(cfg ndog.ListenConfig) error {
 			if opts.Zone {
 				zp := dns.NewZoneParser(stream.Reader, q.Name, "")
 				zp.SetDefaultTTL(0)
-				rr, _ := zp.Next()
+				for {
+					rr, ok := zp.Next()
+					if !ok {
+						break
+					}
+					fmt.Println(rr)
+					if q.Name == rr.Header().Name && q.Qclass == rr.Header().Class && q.Qtype == rr.Header().Rrtype {
+						return rr, nil
+					}
+				}
 				if err := zp.Err(); err != nil {
 					return nil, fmt.Errorf("error parsing zone from stream: %w", err)
 				}
-				return rr, nil
+				return nil, nil
 			} else {
 				values := []string{}
 				scanner := bufio.NewScanner(stream.Reader)
