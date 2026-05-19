@@ -6,6 +6,7 @@ import (
 	"github.com/isobit/ndog/internal"
 	"github.com/isobit/ndog/internal/schemes/dns"
 	"github.com/isobit/ndog/internal/schemes/http"
+	"github.com/isobit/ndog/internal/schemes/mcp"
 	"github.com/isobit/ndog/internal/schemes/postgresql"
 	"github.com/isobit/ndog/internal/schemes/ssh"
 	"github.com/isobit/ndog/internal/schemes/tcp"
@@ -18,6 +19,7 @@ func init() {
 		dns.Scheme,
 		http.HTTPScheme,
 		http.HTTPGraphQLScheme,
+		mcp.Scheme,
 		postgresql.Scheme,
 		postgresql.ListenScheme,
 		postgresql.NotifyScheme,
