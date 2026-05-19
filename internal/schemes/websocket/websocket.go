@@ -99,7 +99,7 @@ func Listen(cfg ndog.ListenConfig) error {
 type ConnectOptions struct {
 	Origin      string
 	Protocol    string
-	Headers     map[string]string
+	Headers     map[string][]string
 	MessageType int
 }
 
@@ -112,7 +112,7 @@ var connectOptionHelp = ndog.OptionsHelp{}.
 func extractConnectOptions(opts ndog.Options) (ConnectOptions, error) {
 	o := ConnectOptions{
 		Origin:      "http://localhost",
-		Headers:     map[string]string{},
+		Headers:     map[string][]string{},
 		MessageType: websocket.BinaryMessage,
 	}
 
@@ -129,12 +129,12 @@ func extractConnectOptions(opts ndog.Options) (ConnectOptions, error) {
 	}
 
 	headerKeyPrefix := "header."
-	for key, val := range opts {
+	for key, vals := range opts {
 		if !strings.HasPrefix(key, headerKeyPrefix) {
 			continue
 		}
 		headerKey := strings.TrimPrefix(key, headerKeyPrefix)
-		o.Headers[headerKey] = val
+		o.Headers[headerKey] = append(o.Headers[headerKey], vals...)
 		delete(opts, key)
 	}
 
@@ -148,8 +148,10 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	header := http.Header{}
-	for key, val := range opts.Headers {
-		header.Add(key, val)
+	for key, vals := range opts.Headers {
+		for _, val := range vals {
+			header.Add(key, val)
+		}
 	}
 
 	tlsConfig, err := cfg.TLS.Config(false, nil)

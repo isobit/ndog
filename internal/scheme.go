@@ -38,14 +38,25 @@ type ConnectConfig struct {
 	Stream Stream
 }
 
-type Options map[string]string
+type Options map[string][]string
 
 func (opts Options) Pop(key string) (string, bool) {
-	v, ok := opts[key]
+	vals, ok := opts[key]
 	if ok {
 		delete(opts, key)
 	}
-	return v, ok
+	if len(vals) == 0 {
+		return "", ok
+	}
+	return vals[0], ok
+}
+
+func (opts Options) PopAll(key string) ([]string, bool) {
+	vals, ok := opts[key]
+	if ok {
+		delete(opts, key)
+	}
+	return vals, ok
 }
 
 func (opts Options) Done() error {

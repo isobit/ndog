@@ -18,7 +18,7 @@ import (
 
 type listenOptions struct {
 	StatusCode    int
-	Headers       map[string]string
+	Headers       map[string][]string
 	ProxyPass     string
 	ServeFile     string
 	MsgpackToJSON bool
@@ -34,7 +34,7 @@ var listenOptionHelp = ndog.OptionsHelp{}.
 func extractListenOptions(opts ndog.Options) (listenOptions, error) {
 	o := listenOptions{
 		StatusCode: 200,
-		Headers:    map[string]string{},
+		Headers:    map[string][]string{},
 	}
 	if _, ok := opts.Pop("msgpack_to_json"); ok {
 		o.MsgpackToJSON = true
@@ -59,12 +59,12 @@ func extractListenOptions(opts ndog.Options) (listenOptions, error) {
 	}
 
 	headerKeyPrefix := "header."
-	for key, val := range opts {
+	for key, vals := range opts {
 		if !strings.HasPrefix(key, headerKeyPrefix) {
 			continue
 		}
 		headerKey := strings.TrimPrefix(key, headerKeyPrefix)
-		o.Headers[headerKey] = val
+		o.Headers[headerKey] = append(o.Headers[headerKey], vals...)
 		delete(opts, key)
 	}
 
@@ -133,8 +133,10 @@ func Listen(cfg ndog.ListenConfig) error {
 			stream.Writer.Close()
 
 			// Send response.
-			for key, val := range opts.Headers {
-				w.Header().Add(key, val)
+			for key, vals := range opts.Headers {
+				for _, val := range vals {
+					w.Header().Add(key, val)
+				}
 			}
 			log.Logf(10, "writing status code %d", opts.StatusCode)
 			w.WriteHeader(opts.StatusCode)

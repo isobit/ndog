@@ -17,7 +17,7 @@ import (
 
 type connectOptions struct {
 	Method          string
-	Headers         map[string]string
+	Headers         map[string][]string
 	FollowRedirects bool
 	GraphQL         bool
 }
@@ -33,8 +33,8 @@ var connectOptionHelpGraphql = ndog.OptionsHelp{}.
 func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions, error) {
 	o := connectOptions{
 		Method: "GET",
-		Headers: map[string]string{
-			"User-Agent": fmt.Sprintf("ndog/%s", version.Version),
+		Headers: map[string][]string{
+			"User-Agent": {fmt.Sprintf("ndog/%s", version.Version)},
 		},
 	}
 
@@ -42,7 +42,7 @@ func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions,
 	case "graphql":
 		o.GraphQL = true
 		o.Method = "POST"
-		o.Headers["Content-Type"] = "application/json"
+		o.Headers["Content-Type"] = []string{"application/json"}
 	default:
 		if m := strings.ToUpper(subscheme); slices.Contains(methods, m) {
 			o.Method = m
@@ -58,12 +58,12 @@ func extractConnectOptions(opts ndog.Options, subscheme string) (connectOptions,
 	}
 
 	headerKeyPrefix := "header."
-	for key, val := range opts {
+	for key, vals := range opts {
 		if !strings.HasPrefix(key, headerKeyPrefix) {
 			continue
 		}
 		headerKey := strings.TrimPrefix(key, headerKeyPrefix)
-		o.Headers[headerKey] = val
+		o.Headers[headerKey] = append(o.Headers[headerKey], vals...)
 		delete(opts, key)
 	}
 
@@ -112,17 +112,19 @@ func Connect(cfg ndog.ConnectConfig) error {
 	if err != nil {
 		return err
 	}
-	for key, val := range opts.Headers {
-		if strings.EqualFold(key, "host") {
-			log.Logf(2, "setting host: %s", val)
-			httpReq.Host = val
+	for key, vals := range opts.Headers {
+		for _, val := range vals {
+			if strings.EqualFold(key, "host") {
+				log.Logf(2, "setting host: %s", val)
+				httpReq.Host = val
 
-			if tlsConfig.ServerName == "" && httpReq.URL.Scheme == "https" {
-				log.Logf(1, "TLS server name not explicitly set, using host header value")
-				tlsConfig.ServerName = val
+				if tlsConfig.ServerName == "" && httpReq.URL.Scheme == "https" {
+					log.Logf(1, "TLS server name not explicitly set, using host header value")
+					tlsConfig.ServerName = val
+				}
 			}
+			httpReq.Header.Add(key, val)
 		}
-		httpReq.Header.Add(key, val)
 	}
 
 	transport := &http.Transport{
@@ -170,7 +172,7 @@ func Connect(cfg ndog.ConnectConfig) error {
 	}
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf(resp.Status)
+		return fmt.Errorf("%s", resp.Status)
 	}
 	return nil
 }

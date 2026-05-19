@@ -86,10 +86,10 @@ func (cmd Ndog) Run() error {
 	}
 
 	// Parse options.
-	opts := map[string]string{}
+	opts := ndog.Options{}
 	for _, s := range cmd.Options {
 		key, value, _ := strings.Cut(s, "=")
-		opts[key] = value
+		opts[key] = append(opts[key], value)
 	}
 
 	var listenScheme *ndog.Scheme
@@ -197,7 +197,7 @@ func listSchemes() error {
 			supports = append(supports, "connect")
 		}
 
-		fmt.Fprintf(w, name)
+		fmt.Fprintf(w, "%s", name)
 		if len(supports) > 0 {
 			fmt.Fprintf(w, "\t (%s)", strings.Join(supports, ", "))
 		}
